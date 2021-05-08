@@ -1,0 +1,49 @@
+.bgdarkgray {
+    background-color: #5f788a;
+}
+
+.bgwhite {
+    background-color: white;
+}
+
+.bgblack {
+    background-color: black;
+    color: green;
+}
+
+.removeBottomMargin {
+    margin-bottom: 0 !important;
+}
+
+.menuWhite {
+    color: white;
+}
+
+.loginPadding {
+    padding: 10%;
+}
+
+.nadpisAlign {
+    padding: 5%;
+}
+
+.tabPadding {
+    padding-top: 3%;
+}
+
+.footer {
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    background-color: #5f788a;
+    color: white;
+    text-align: center;
+    font-weight: 500;
+}
+
+.sticky {
+    position: sticky !important;
+    bottom: 0;
+    background-color: black;
+    color: green;
+}

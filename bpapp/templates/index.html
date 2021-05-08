@@ -1,0 +1,86 @@
+{% load static %}
+<!DOCTYPE html>
+    <head>
+        <link rel="stylesheet" type="text/css" href="{% static 'css/style.css' %}">
+	    <link rel="stylesheet" type="text/css" href="{% static 'css/bootstrap.css' %}">
+        <title>Bakalársky projekt</title>
+    </head>
+    <body>
+    <header class="site-header">
+        <nav class="navbar navbar-expand-sm bg-dark navbar-dark bgdarkgray">
+            <div class="row bg-dark">
+                <div class="col-md-12">
+                    <ul class="nav nav-pills">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="{% url 'index' %}">Home</a>
+                        </li>
+                        <li class="nav-item dropdown ml-md-auto">
+                            <a class="nav-link dropdown-toggle menuWhite" href="#" id="navbarDropdownMenuLink" data-toggle="dropdown">Menu</a>
+                            <div class="dropdown-menu dropdown-menu-right bgdarkgray" aria-labelledby="navbarDropdownMenuLink">
+                                {% if login %}
+                                    <a class="dropdown-item" href="{% url 'logout' %}">Logout ({{ login }})</a>
+                                {% else %}
+                                    <a class="dropdown-item" href="{% url 'login' %}">Login</a>
+                                {% endif %}
+                                <div class="dropdown-divider"></div> 
+                                <a class="dropdown-item" href="#">About</a>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+      </header>
+      <main role="main" class="container">
+        {% if messages %}
+        <ul class="messages">
+          {% for message in messages %}
+            <div class="alert alert-danger alert-dismissable" role="alert" style="text-align: center">
+              <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+              {{ message }}
+            </div>
+          {% endfor %}
+        </ul>
+        {% endif %}
+        <div class="row">
+          <div class="col-md-12">
+            {% block body %}{% endblock %}
+          </div>
+        </div>
+      </main>
+      <div class="sticky">
+        <ol class="list-unstyled removeBottomMargin">
+          <li class="list-item">
+            Lorem ipsum dolor sit amet
+          </li>
+          <li class="list-item">
+            Consectetur adipiscing elit
+          </li>
+          <li class="list-item">
+            Integer molestie lorem at massa
+          </li>
+          <li class="list-item">
+            Facilisis in pretium nisl aliquet
+          </li>
+          <li class="list-item">
+            Nulla volutpat aliquam velit
+          </li>
+          <li class="list-item">
+            Faucibus porta lacus fringilla vel
+          </li>
+          <li class="list-item">
+            Aenean sit amet erat nunc
+          </li>
+          <li class="list-item">
+            Eget porttitor lorem
+          </li>
+        </ol>
+      </div>
+      <div class="footer">
+          <p class="mr-4 removeBottomMargin">© Matej Glemba</p>
+      </div>
+      <script src="{% static 'js/jquery.min.js' %}"></script>
+      <script src="{% static 'js/bootstrap.min.js' %}"></script>
+      <script src="{% static 'js/scripts.js' %}"></script>
+    </body>
+</html>
