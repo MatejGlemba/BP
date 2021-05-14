@@ -1,368 +1,40 @@
 {% extends 'index.html' %}
 {% load static %}
+{% block styles %}{% endblock %}
 {% block body %}
-<div class="tabbable" id="tabs-402937">
-	<ul class="nav nav-tabs tabPadding">
-		<li class="nav-item">
-			<a class="nav-link" href="#tab1" data-toggle="tab">Analýza 1</a>
-		</li>
-		<li class="nav-item">
-			<a class="nav-link" href="#tab2" data-toggle="tab">Analýza 2</a>
-		</li>
-		<li class="nav-item">
-			<a class="nav-link" href="#tab3" data-toggle="tab">Analýza 3</a>
-		</li>
-	</ul>
-	<div class="tab-content">
-		<!--                               1. Analyza							-->
-		<div class="tab-pane" id="tab1">
-			<h1 class="nadpisAlign">Analýza 1 - Odporúčací systém</h1>
-			<div class="tabbable" id="tabs-402938">
-				<ul class="nav nav-tabs">
-					<li class="nav-item">
-						<a class="nav-link" href="#subtab1" data-toggle="tab">Import dát</a>
-					</li>
-					<li class="nav-item">
-						<a class="nav-link" href="#subtab2" data-toggle="tab">Úprava vstupov</a>
-					</li>
-					<li class="nav-item">
-						<a class="nav-link" href="#subtab3" data-toggle="tab">Analyzuj</a>
-					</li>
-				</ul>
-			</div>
-			<div class="tab-content">
-				<!-- 			Import dat 				-->
-				<div class="tab-pane"  id="subtab1">
-					<div class="row nadpisAlign">
-						<div class="col-md-6">
-							<form role="form">
-								<div class="form-group">
-									<label for="opacLink">OPAC url link</label>
-									<input type="url" class="form-control" id="opacLink">
-								</div>
-								<div class="form-group">
-									<label for="inputFile">Nahraj súbor</label>
-									<input type="file" class="form-control-file" id="inputFile">
-									<p class="help-block">Podporované súbory: .txt, .csv</p>
-								</div>
-								<button type="submit" class="btn btn-primary">Submit</button>
-							</form>
-						</div>
-						<div class="col-md-6"></div>
-					</div>
-				</div>
-				<!-- 			Uprava vstupov 				-->
-				<div class="tab-pane" id="subtab2">
-					<div class="row nadpisAlign">
-						<div class="col-md-6">	 
-							<form role="form" action="{% url 'data' %}" method="POST">
-								{% csrf_token %}
-								<div class="form-group">
-									<div class="dropdown">
-										<button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown">
-											Action
-										</button>
-										<div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-											<a class="dropdown-item disabled" href="#">Action</a> 
-											<a class="dropdown-item" href="#">Another action</a> 
-											<a class="dropdown-item" href="#">Something else here</a>
-										</div>
-									</div>
-								</div>
-								<div class="form-group">
-									<label for="vstup1">Vstup 1</label>
-									<input type="url" class="form-control" id="vstup1">
-								</div>
-								<div class="form-group">
-									<label for="vstup2">Vstup 2</label>
-									<input type="url" class="form-control" id="vstup2">	
-								</div>
-								<div class="form-group">
-									<label for="vstup3">Vstup 3</label>
-									<input type="url" class="form-control" id="vstup3">
-								</div>
-								<button type="submit" class="btn btn-primary">Submit</button>
-							</form>
-						</div>
-					</div>
-					{% if displayImportData %}
-						<div class="row">
-							<div class="col-md-12">
-								<table class="table table-hover">
-									<thead>
-										<tr>
-											<th>
-												#
-											</th>
-											<th>
-												Product
-											</th>
-											<th>
-												Payment Taken
-											</th>
-											<th>
-												Status
-											</th>
-										</tr>
-									</thead>
-									<tbody>
-										<tr>
-											<td>
-												1
-											</td>
-											<td>
-												TB - Monthly
-											</td>
-											<td>
-												01/04/2012
-											</td>
-											<td>
-												Default
-											</td>
-										</tr>
-										<tr class="table-active">
-											<td>
-												1
-											</td>
-											<td>
-												TB - Monthly
-											</td>
-											<td>
-												01/04/2012
-											</td>
-											<td>
-												Approved
-											</td>
-										</tr>
-										<tr class="table-success">
-											<td>
-												2
-											</td>
-											<td>
-												TB - Monthly
-											</td>
-											<td>
-												02/04/2012
-											</td>
-											<td>
-												Declined
-											</td>
-										</tr>
-										<tr class="table-warning">
-											<td>
-												3
-											</td>
-											<td>
-												TB - Monthly
-											</td>
-											<td>
-												03/04/2012
-											</td>
-											<td>
-												Pending
-											</td>
-										</tr>
-										<tr class="table-danger">
-											<td>
-												4
-											</td>
-											<td>
-												TB - Monthly
-											</td>
-											<td>
-												04/04/2012
-											</td>
-											<td>
-												Call in to confirm
-											</td>
-										</tr>
-									</tbody>
-								</table>
-								<nav>
-									<ul class="pagination">
-										<li class="page-item">
-											<a class="page-link" href="#">Previous</a>
-										</li>
-										<li class="page-item">
-											<a class="page-link" href="#">1</a>
-										</li>
-										<li class="page-item">
-											<a class="page-link" href="#">2</a>
-										</li>
-										<li class="page-item">
-											<a class="page-link" href="#">3</a>
-										</li>
-										<li class="page-item">
-											<a class="page-link" href="#">4</a>
-										</li>
-										<li class="page-item">
-											<a class="page-link" href="#">5</a>
-										</li>
-										<li class="page-item">
-											<a class="page-link" href="#">Next</a>
-										</li>
-									</ul>
-								</nav>
-							</div>
-						</div>
-					{% endif %}
-				</div>
+<div class="btn-group buttonsCenter" role="group">
+	{% if analyzaId == 1 %}				 
+	<a href="{% url 'analyza' id=1 %}#subtab1" onclick="tab('#subtab1', 'href1')"><button class="btn btn-secondary buttonsSize currectPageStyle" type="button">
+		Analýza 1
+	</button></a>
+	{% else %}
+	<a href="{% url 'analyza' id=1 %}#subtab1"><button class="btn btn-secondary buttonsSize" type="button">
+		Analýza 1
+	</button></a>
+	{% endif %}
 
-				<!-- 			Analyzuj					-->
-				<div class="tab-pane" id="subtab3">
-					<div class="row tabPadding">
-						<div class="col-md-6">
-							<div class="media">
-								<img class="mr-3" alt="Bootstrap Media Preview" src="https://www.layoutit.com/img/sports-q-c-64-64-8.jpg">
-								<div class="media-body">
-									<h5 class="mt-0">
-										Nested media heading
-									</h5> Cras sit amet nibh libero, in gravida nulla. Nulla vel metus scelerisque ante sollicitudin commodo. Cras purus odio, vestibulum in vulputate at, tempus viverra turpis.
-								</div>
-							</div>
-						</div>
-						<div class="col-md-6">
-							<div class="media">
-								<img class="mr-3" alt="Bootstrap Media Preview" src="https://www.layoutit.com/img/sports-q-c-64-64-8.jpg">
-								<div class="media-body">
-									<h5 class="mt-0">
-										Nested media heading
-									</h5> Cras sit amet nibh libero, in gravida nulla. Nulla vel metus scelerisque ante sollicitudin commodo. Cras purus odio, vestibulum in vulputate at, tempus viverra turpis.
-								</div>
-							</div>
-						</div>
-					</div>
-					<div class="row">
-						<div class="col-md-12">
-							<table class="table table-hover">
-								<thead>
-									<tr>
-										<th>
-											#
-										</th>
-										<th>
-											Product
-										</th>
-										<th>
-											Payment Taken
-										</th>
-										<th>
-											Status
-										</th>
-									</tr>
-								</thead>
-								<tbody>
-									<tr>
-										<td>
-											1
-										</td>
-										<td>
-											TB - Monthly
-										</td>
-										<td>
-											01/04/2012
-										</td>
-										<td>
-											Default
-										</td>
-									</tr>
-									<tr class="table-active">
-										<td>
-											1
-										</td>
-										<td>
-											TB - Monthly
-										</td>
-										<td>
-											01/04/2012
-										</td>
-										<td>
-											Approved
-										</td>
-									</tr>
-									<tr class="table-success">
-										<td>
-											2
-										</td>
-										<td>
-											TB - Monthly
-										</td>
-										<td>
-											02/04/2012
-										</td>
-										<td>
-											Declined
-										</td>
-									</tr>
-									<tr class="table-warning">
-										<td>
-											3
-										</td>
-										<td>
-											TB - Monthly
-										</td>
-										<td>
-											03/04/2012
-										</td>
-										<td>
-											Pending
-										</td>
-									</tr>
-									<tr class="table-danger">
-										<td>
-											4
-										</td>
-										<td>
-											TB - Monthly
-										</td>
-										<td>
-											04/04/2012
-										</td>
-										<td>
-											Call in to confirm
-										</td>
-									</tr>
-								</tbody>
-							</table>
-							<nav>
-								<ul class="pagination">
-									<li class="page-item">
-										<a class="page-link" href="#">Previous</a>
-									</li>
-									<li class="page-item">
-										<a class="page-link" href="#">1</a>
-									</li>
-									<li class="page-item">
-										<a class="page-link" href="#">2</a>
-									</li>
-									<li class="page-item">
-										<a class="page-link" href="#">3</a>
-									</li>
-									<li class="page-item">
-										<a class="page-link" href="#">4</a>
-									</li>
-									<li class="page-item">
-										<a class="page-link" href="#">5</a>
-									</li>
-									<li class="page-item">
-										<a class="page-link" href="#">Next</a>
-									</li>
-								</ul>
-							</nav>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-		<!--                               2. Analyza							-->
-		<div class="tab-pane" id="tab2">
-			<h1 class="nadpisAlign">Analýza 2 - Analýza vyhľadávania v OPAC-u</h1>
-		</div>
-
-		<!--                               3. Analyza							-->
-		<div class="tab-pane" id="tab3">
-			<h1 class="nadpisAlign">Analýza 3 - Analýza finančnej efektivity knižnice</h1>
-		</div>
-	</div>
+	{% if analyzaId == 2%}
+	<a href="{% url 'analyza' id=2 %}#subtab1"><button class="btn btn-secondary buttonsSize currectPageStyle" type="button">
+		Analýza 2
+	</button></a> 
+	{% else %}
+	<a href="{% url 'analyza' id=2 %}#subtab1"><button class="btn btn-secondary buttonsSize" type="button">
+		Analýza 2
+	</button></a>
+	{% endif %}
+	{% if analyzaId == 3%}
+	<a href="{% url 'analyza' id=3 %}"><button class="btn btn-secondary buttonsSize currectPageStyle" type="button">
+		Analýza 3
+	</button></a>
+	{% else %}
+	<a href="{% url 'analyza' id=3 %}"><button class="btn btn-secondary buttonsSize" type="button">
+		Analýza 3
+	</button></a>
+	{% endif %}
 </div>
+<div class="tabCenter">
+	{% block analyzy %}{% endblock %}
+</div>
+{% endblock %}
+{% block scripts %}
 {% endblock %}

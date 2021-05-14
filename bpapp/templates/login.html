@@ -1,7 +1,7 @@
 {% extends 'index.html' %}
 {% load static %}
 {% block body %}
-<div class="row loginPadding">
+<div class="loginPadding">
   <div class="col-md-12">
     <form action="{% url 'index' %}" role="form" method="post" class="from-group">
       {% csrf_token %}

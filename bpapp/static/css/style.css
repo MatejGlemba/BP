@@ -21,16 +21,27 @@
 
 .loginPadding {
     padding: 10%;
+    max-width: fit-content;
+    margin-left: 25%;
 }
 
 .nadpisAlign {
-    padding: 5%;
+    padding: 1%;
+    text-align: center;
 }
 
 .tabPadding {
     padding-top: 3%;
 }
 
+.tabAlign {
+    padding: 3%
+}
+
+.alignCenter {
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
 .footer {
     left: 0;
     bottom: 0;
@@ -46,4 +57,25 @@
     bottom: 0;
     background-color: black;
     color: green;
+}
+
+.buttonsCenter {
+    width: 100%;
+    margin: auto;
+    padding: 3%;
+    justify-content: center;
+}
+
+.tabCenter {
+    width: 100%;
+    margin: auto;
+    justify-content: center;
+}
+
+.buttonsSize {
+    font-size: 2rem !important;
+}
+
+.currectPageStyle {
+    background-color: #a3a5a7 !important;
 }

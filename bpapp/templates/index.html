@@ -2,9 +2,10 @@
 <!DOCTYPE html>
     <head>
         <link rel="stylesheet" type="text/css" href="{% static 'css/style.css' %}">
-	    <link rel="stylesheet" type="text/css" href="{% static 'css/bootstrap.css' %}">
+	      <link rel="stylesheet" type="text/css" href="{% static 'css/bootstrap.css' %}">
+        {% block styles %}{% endblock %}
         <title>Bakalársky projekt</title>
-    </head>
+    </head>   
     <body>
     <header class="site-header">
         <nav class="navbar navbar-expand-sm bg-dark navbar-dark bgdarkgray">
@@ -31,11 +32,11 @@
             </div>
         </nav>
       </header>
-      <main role="main" class="container">
+      <main role="main">
         {% if messages %}
         <ul class="messages">
           {% for message in messages %}
-            <div class="alert alert-danger alert-dismissable" role="alert" style="text-align: center">
+            <div class="alert alert-success alert-dismissable" role="alert" style="text-align: center">
               <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
               {{ message }}
             </div>
@@ -48,39 +49,19 @@
           </div>
         </div>
       </main>
-      <div class="sticky">
+      <!--<div class="sticky">
         <ol class="list-unstyled removeBottomMargin">
           <li class="list-item">
             Lorem ipsum dolor sit amet
           </li>
-          <li class="list-item">
-            Consectetur adipiscing elit
-          </li>
-          <li class="list-item">
-            Integer molestie lorem at massa
-          </li>
-          <li class="list-item">
-            Facilisis in pretium nisl aliquet
-          </li>
-          <li class="list-item">
-            Nulla volutpat aliquam velit
-          </li>
-          <li class="list-item">
-            Faucibus porta lacus fringilla vel
-          </li>
-          <li class="list-item">
-            Aenean sit amet erat nunc
-          </li>
-          <li class="list-item">
-            Eget porttitor lorem
-          </li>
         </ol>
-      </div>
+      </div>-->
       <div class="footer">
           <p class="mr-4 removeBottomMargin">© Matej Glemba</p>
       </div>
+      {% block scripts %}{% endblock %}
       <script src="{% static 'js/jquery.min.js' %}"></script>
       <script src="{% static 'js/bootstrap.min.js' %}"></script>
       <script src="{% static 'js/scripts.js' %}"></script>
-    </body>
+  </body>
 </html>
