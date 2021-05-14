@@ -42,7 +42,7 @@
                         </div>
                         <div class="form-group">
                             <label for="inputFile">Nahraj katalógový súbor</label>
-                            <input placeholder="katalog.xml" type="file" class="form-control-file" name="fileXML" id="inputFileXml" required>
+                            <input placeholder="katalog.xml" type="file" class="form-control-file" name="fileXML" id="inputFileXml">
                             <p class="help-block">Podporovaný súbor: .xml</p>
                         </div>
                         <!--<div class="form-group">
@@ -53,6 +53,7 @@
                             <button type="submit" class="btn btn-primary">Potvrď</button>
                         </div> 
                     </form>
+                    <hr>
                 </div>
             </div>
             {% if data %}
@@ -75,7 +76,7 @@
                                 <td>{{ d.casVytvoreniaTransakcie }}</td>
                                 <td>{{ d.vek }}</td>
                                 <td>{{ d.pohlavie }}</td>
-                                <td>{{ d.psc }}</td>
+                                <td>{{ d.psc_id.obvod }}</td>
                             </tr>
                             {% endfor%}
                         </tbody>
@@ -137,15 +138,15 @@
                             <div class="col-md-4">
                                 <div class="form-group">
                                     <div class="dropdown">  
-                                        <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown">
+                                        <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton1" data-toggle="dropdown">
                                             Veková skupina
                                         </button>
-                                        <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                                        <div class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
                                             <div class="row" style="width: max-content;">
                                                 <div class="col-md-12">
-                                                    <div><input type="checkbox" style="margin: 5px;" name="select-age-all" id="select-age-all" /><label style="margin-right: 5px;">Vyber všetky</label></div>
+                                                    <div><input type="checkbox" style="margin: 5px;" name="age-all" id="select-age-all" /><label style="margin-right: 5px;">Vyber všetky</label></div>
                                                     {% for v in vek %}
-                                                    <div><input type="checkbox" style="margin: 5px;" id="vek_{{v.id}}"><label style="margin-right: 5px;">{{ v.skupina }}</label></div>
+                                                    <div><input type="checkbox" style="margin: 5px;" name="vek_{{v.id}}"><label style="margin-right: 5px;">{{ v.skupina }}</label></div>
                                                     {% endfor %}
                                                 </div>
                                             </div>
@@ -156,15 +157,15 @@
                             <div class="col-md-4">
                                 <div class="form-group">
                                     <div class="dropdown">  
-                                        <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown">
+                                        <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton2" data-toggle="dropdown">
                                             PSČ Obvodu
                                         </button>
-                                        <div class="dropdown-menu" aria-labelledby="dropdownMenuButton" style="overflow-y: auto; max-height: 400px;">
+                                        <div class="dropdown-menu" aria-labelledby="dropdownMenuButton2" style="overflow-y: auto; max-height: 400px;">
                                             <div class="row" style="width: max-content;">
                                                 <div class="col-md-12">
-                                                    <div><input type="checkbox" style="margin: 5px;" name="select-all" id="select-all" /><label style="margin-right: 5px;">Vyber všetky</label></div>
+                                                    <div><input type="checkbox" style="margin: 5px;" name="psc-all" id="select-psc-all" /><label style="margin-right: 5px;">Vyber všetky</label></div>
                                                     {% for p in psc %}
-                                                    <div><input type="checkbox" style="margin: 5px;" id="psc_{{p.psc}}"><label style="margin-right: 5px;">{{ p.obvod }}</label></div>
+                                                    <div><input type="checkbox" style="margin: 5px;" name="psc_{{p.psc}}"><label style="margin-right: 5px;">{{ p.obvod }}</label></div>
                                                     {% endfor %}
                                                 </div>
                                             </div>
@@ -178,7 +179,7 @@
                                 <div class="form-group">
                                     <label>OD:</label>
                                     <div class='input-group date' id='datetimepicker6'>
-                                    <input type="date" placeholder="" id="birthday" name="birthday">
+                                    <input type="date" placeholder="" id="birthday" name="od">
                                    </div>
                                 </div>
                             </div>
@@ -186,7 +187,7 @@
                                 <div class="form-group">
                                     <label>DO:</label>
                                     <div class='input-group date' id='datetimepicker7'>
-                                    <input type="date" placeholder="" id="birthday" name="birthday">
+                                    <input type="date" placeholder="" id="birthday" name="do">
                                    </div>
                                 </div>
                             </div> 
@@ -219,7 +220,7 @@
                                 <td>{{ d.casVytvoreniaTransakcie }}</td>
                                 <td>{{ d.vek }}</td>
                                 <td>{{ d.pohlavie }}</td>
-                                <td>{{ d.psc }}</td>
+                                <td>{{ d.psc_id.obvod }}</td>
                             </tr>
                             {% endfor%}
                         </tbody>

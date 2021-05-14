@@ -1,7 +1,7 @@
 # Create your views here.
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
-from .models import User, Katalog, Pohlavie, PscObvodu, VekovaSkupina, Konspekt, TypOperacie, Analyza1Model, Analyza2Model, Analyza3Model
+from .models import User, Katalog, PscObvodu, VekovaSkupina, Konspekt, TypOperacie, Analyza1Model, Analyza2Model, Analyza3Model
 from django.contrib import messages
 from django.urls import reverse
 from django.contrib.sessions.models import Session 
@@ -12,12 +12,15 @@ import xml.etree.ElementTree as ET
 from pymarc import MARCReader, parse_xml_to_array, Record
 import xmltodict, numpy, pandas as pd, matplotlib.pyplot as plt
 from scipy import stats
+from django.db.models import Q
+from operator import or_
+from functools import reduce
 
 
 user = {}
-id2Flag = None
 importData = None
 xmlCat = None
+csvFile = None
 
 def index(request):
     if request.method == 'POST' and not user and request.POST["login"] == "admin":
@@ -25,7 +28,7 @@ def index(request):
         context = {
             'login' : user["login"]
         }
-        #Transakcia.objects.all().delete()
+        #Clear models
         Katalog.objects.all().delete()
         PscObvodu.objects.all().delete()
         Konspekt.objects.all().delete()
@@ -92,49 +95,34 @@ def analyza(request, id):
             return render(request, 'main.html', context=context)   
 
 def analyzaVystup(request, id, id2):
-    global id2Flag
     global importData
     if user:
         if id == 1: 
             if id2 == 'import' and request.method == 'POST':
-                id2Flag = id2
                 fileCSV = request.FILES['fileCSV']
-                fileXML = request.FILES['fileXML']
-                if fileCSV.name.endswith('.csv') and fileXML.name.endswith('.xml'):
-                    xmlFile(fileXML, id, request)
+                #fileXML = request.FILES['fileXML']
+                if fileCSV.name.endswith('.csv'):# and fileXML.name.endswith('.xml'):
+                   # xmlFile(fileXML, id, request)
                     csvFile(fileCSV, id, request)
                 else:
                     messages.error(request, 'THIS IS NOT A CSV or XML FILE')
                 importData = Analyza1Model.objects.all()
-                paginator = Paginator(importData, 5)
-                page = request.GET.get('page', 1)
-                data = paginator.page(page)
-                context = {
-                    'login' : user["login"],
-                    'typ' : id2,
-                    'flag' : id2Flag,
-                    'data' : data,
-                }  
             elif id2 == 'uprava' and request.method == 'POST':
-                context = {
-                    'login' : user["login"],
-                    'typ' : id2,
-                    'flag' : id2Flag,
-                    'data' : importData,
-                }  
+                vstupy = spracujVstupy(request, id)
+                importData2 = data_processing(vstupy, id)
             elif id2 == 'analyza' and request.method == 'POST':
                 id2Flag = id2
-            else:
-                id2Flag = id2
-            # Paginator musi byt aj tu
+            paginator = Paginator(importData, 5)
+            page = request.GET.get('page', 1)
+            data = paginator.page(page)
             context = {
                 'login' : user["login"],
                 'typ' : id2,
-                'flag' : id2Flag,
-                'data' : importData,
-                'psc' : PscObvodu.objects.all()
-                #'graph' : graphic
-            }  
+                'analyzaId' : id,
+                'data' : data,
+                'psc' : PscObvodu.objects.all(),
+                'vek' : VekovaSkupina.objects.all(),
+            }   
             return render(request, 'analyza1.html', context=context)
         elif id == 2 and request.method == 'POST':
             return render(request, 'analyza2.html', context=context)
@@ -170,17 +158,7 @@ def inicializaciaCiselnikov():
                 nazov=row[1],
                 )
     
-    ## Ciselnik Pohlavie
-    p = Pohlavie()
-    setattr(p, 'id', 0)
-    setattr(p, 'pohlavie', "Muž")
-    p.save()
-    p = Pohlavie()
-    setattr(p, 'id', 1)
-    setattr(p, 'pohlavie', "Žena")
-    p.save()
-
-    ## Ciselnik Pohlavie
+    ## Ciselnik Vekova skupina
     v = VekovaSkupina()
     setattr(v, 'id', 0)
     setattr(v, 'skupina', "0-20")
@@ -209,59 +187,6 @@ def inicializaciaCiselnikov():
     setattr(v, 'id', 6)
     setattr(v, 'skupina', "71+")
     v.save()
-
-def hasDigitAndDot(inputString):
-    return any(char.isdigit() for char in inputString) and "." not in inputString
-
-def putIntoDB(rows, id):
-    for key, value in rows.items():
-        if id == 1:
-            obj = Analyza1Model()
-        elif id == 2:
-            obj = Analyza2Model()
-        elif id == 3:
-            obj = Analyza3Model()
-        for key, value in value.items():
-            #print(key, value)
-            setattr(obj, key, value)
-        obj.save()
-
-def displayMarcXml(file):
-    records = parse_xml_to_array(file)
-    for record in records:
-        print(record.leader)
-        for field in record.get_fields():
-            if field.is_control_field():
-                print("controlField", field.tag, field.data)
-            else:
-                print("datafield", field.tag, field.indicators)
-                print("subfields:")
-                for k,v in dict(field.subfields_as_dict()).items():
-                    print(k, v)
-        print("--------------------------------")
-
-def validation(row, id, request):
-    if id == 1:
-        if row['vek'] <= 0 and not any(char.isdigit() for char in row['vek']):
-            row['vek'] = random.randint(15, 80)
-        if row['tcreate']: 
-            row['tcreate'] = row['tccreate'][0:8]
-        if not row['pohlavi']:
-            r = random.randint(0,1)
-            if r == 0:
-                row['pohlavi'] = 'zena'
-            else:
-                row['pohlavi'] = 'muz'
-        #if not row['psc'] or pscNotInAvailablePsc(row['psc']):
-            #row['psc'] = get random psc from psc table
-    return row
-
-def pscNotInAvailablePsc(psc):
-    # check if psc in psc table
-    return
-
-def data_processing():
-    return
 
 def xmlFile(file, id, request):
     records = parse_xml_to_array(file)
@@ -293,6 +218,262 @@ def csvFile(file, id, request):
             messages.error(request, 'File has more than 26 columns !')
     putIntoDB(rows, id)
 
+def inicializeAnalyze1Tab(column, request):
+    row = {}
+    ## tcraete
+    columnCounter = 1
+    tcreate = column[columnCounter]
+    if len(tcreate) == 18 and tcreate[15] == '.' and tcreate[1:9].isdigit():
+        tcreate = tcreate[1:5] + '-' + tcreate[5:7] + '-' + tcreate[7:9]
+        row.update({'casVytvoreniaTransakcie': tcreate})
+    else:
+        messages.error(request, 'Wrong form of tcreate field')
+    
+    columnCounter += 10
+    if hasDigitAndDot(column[columnCounter]): ## check for price, sometimes it has comma inside instead of dot
+        columnCounter += 1
+    columnCounter += 4
+
+    ## pohlavie
+    anonym = column[columnCounter]
+    columnCounter += 1
+    if len(anonym) == 3 and anonym[1].isdigit() and int(anonym[1]) in (0, 1):
+        anonym = int(anonym[1])
+        pohlavie = column[columnCounter]
+        if anonym == 0:
+            if pohlavie.isalpha() and len(pohlavie) > 2 and len(pohlavie) < 7 and pohlavie in ["zena", "muz"]:
+                row.update({'pohlavie': pohlavie})
+            else:
+                r = random.randint(0,1)
+                if r == 0:
+                    pohlavie = "zena"
+                else:
+                    pohlavie = "muz"
+                row.update({'pohlavie': pohlavie})
+        elif anonym == 1:
+            r = random.randint(0,1)
+            if r == 0:
+                pohlavie = "zena"
+            else:
+                pohlavie = "muz"
+            row.update({'pohlavie': pohlavie})
+    else:
+        r = random.randint(0,1)
+        if r == 0:
+            pohlavie = "zena"
+        else:
+            pohlavie = "muz"
+        row.update({'pohlavie': pohlavie})
+        #messages.error(request, 'Wrong form of pohlavie field')
+
+    ## userHash
+    columnCounter += 1
+    userHash = column[columnCounter]
+    if userHash:
+        row.update({'pouzivatelId': userHash})
+    else:
+        messages.error(request, 'Missing UserHash field')
+
+    ## psc
+    columnCounter += 2
+    pscOld = column[columnCounter]
+    if len(pscOld) == 8 and pscOld[4] == " ":
+        psc = pscOld[1:7]
+        psc = psc.replace(' ', '')
+        obv = None
+        if psc.isdigit():
+            try:
+                obv = PscObvodu.objects.get(psc=psc)
+            except:
+                obv = PscObvodu.objects.get(psc=99999)
+                #messages.error(request, 'Wrong form of psc field [Not digit]')
+            row.update({'psc_id': obv})
+        else:
+            #messages.error(request, 'Wrong form of psc field [Not digit]')
+            row.update({'psc_id': PscObvodu.objects.get(psc=99999)})
+    else:
+        #messages.error(request, 'Wrong form of psc field')
+        row.update({'psc_id': PscObvodu.objects.get(psc=99999)})
+    
+    ## vek
+    columnCounter += 1
+    if anonym == 0: 
+        vek = column[columnCounter].replace('"', '')
+        if vek.isdigit() and int(vek) > 5:   
+            row.update({'vek': int(vek)})
+        else:
+            row.update({'vek': random.randint(15, 80)})
+            #messages.error(request, 'Wrong form of vek field')
+    elif anonym == 1:
+        row.update({'vek': random.randint(15, 80)})
+    
+    return row
+
+def inicializeAnalyze2Tab(column):
+    return 
+
+def inicializeAnalyze3Tab(column):
+    return
+
+def hasDigitAndDot(inputString):
+    return any(char.isdigit() for char in inputString) and "." not in inputString
+
+def putIntoDB(rows, id):
+    for key, value in rows.items():
+        if id == 1: ## Store model for analyza1
+            obj = Analyza1Model()
+            for key, value in value.items():
+                setattr(obj, key, value)
+            obj.save()
+        elif id == 2: ## Store model for analyza1
+            obj = Analyza2Model()
+        elif id == 3: ## Store model for analyza1
+            obj = Analyza3Model()
+        
+def spracujVstupy(request, id):
+    vstupy = {}
+    postItems = dict(request.POST.items())
+    
+    ## Pohlavie
+    pohlavie = {}
+    if 'pohlavieM' in postItems:
+        pohlavie.update({'pohlavie': 'muz'})
+    if 'pohlavieZ' in postItems:
+        pohlavie.update({'pohlavie': 'zena'})
+    if pohlavie:
+        vstupy.update({'pohlavie' : pohlavie})
+    
+    ## Vekova Skupina
+    vekSkupina = {}
+    if 'age-all' in postItems:
+        vekSkupina.update({'all': True})
+    else:
+        for obj in VekovaSkupina.objects.all():
+            vekId = 'vek_' + str(obj.id)
+            if vekId in postItems:
+                vekSkupina.update({vekId: obj.id})
+    if vekSkupina:
+        vstupy.update({'vekovaSkupina' : vekSkupina})
+    
+    ## PSC
+    psc = {}
+    if 'psc-all' in postItems:
+        psc.update({'all': True})
+    else:
+        for obj in PscObvodu.objects.all():
+            pscId = 'psc_' + str(obj.psc)
+            if pscId in postItems:
+                psc.update({pscId: obj.psc})
+    if psc:
+        vstupy.update({'pscObvodu' : psc})
+
+    ## Cas
+    cas = {}
+    if 'od' in postItems and not postItems['od'] == '':
+        cas.update({'od': postItems['od']})
+    if 'do' in postItems and not postItems['do'] == '':
+        cas.update({'do': postItems['do']})
+    if cas:
+        vstupy.update({'cas': cas})
+    
+    return vstupy
+
+def data_processing(vstupy, id):
+    vystupy = {}
+    ## pohlavie
+    if 'pohlavie' in vstupy and len(vstupy['pohlavie']) == 1 and 'all' not in vstupy['pohlavie']:
+        pohlavieGroup = Analyza1Model.objects.filter(pohlavie=vstupy['pohlavie']['pohlavie']).values('pouzivatelId').distinct()
+        vystupy.update({'pohlavieHist': pohlavieGroup})
+        print('Pohlavie',len(pohlavieGroup))
+    
+    ## Vekova skupina
+    if 'vekovaSkupina' in vstupy and 'all' not in vstupy['vekovaSkupina']:
+        query = Q()
+        for k, v in dict(vstupy['vekovaSkupina']).items():
+            sk = VekovaSkupina.objects.get(id=v)
+            sk = sk.skupina.split('-')
+            query = query | Q(vek__gte=sk[0],vek__lte=sk[1])
+        vekovaSkupinaGroup = Analyza1Model.objects.filter(query).values('pouzivatelId').distinct()
+        vystupy.update({'vekHist': vekovaSkupinaGroup})
+        print('VEK',len(vekovaSkupinaGroup))
+    
+    ## PSC
+    if 'pscObvodu' in vstupy and 'all' not in vstupy['vekovaSkupina']:
+        query = Q()
+        for k, v in dict(vstupy['pscObvodu']).items():
+            sk = PscObvodu.objects.get(psc=v) 
+            query = query | Q(psc_id=sk.psc)
+        pscGroup = Analyza1Model.objects.filter(query).values('pouzivatelId').distinct()
+        vystupy.update({'pscHist': pscGroup})
+        print('PSC',len(pscGroup))
+
+    ## Cas
+    casGroup = None
+    if 'cas' in vstupy:
+        if len(vstupy['cas']) == 1:
+            if 'od' in vstupy['cas']:
+                ## od - do current datetime
+                casGroup = Analyza1Model.objects.filter(casVytvoreniaTransakcie__gte=vstupy['cas']['od'])
+                print('CAS OD',len(casGroup))
+            else:
+                ## datetime < do
+                casGroup = Analyza1Model.objects.filter(casVytvoreniaTransakcie__lte=vstupy['cas']['do'])
+                print('CAS DO',len(casGroup))
+        else:
+            ## od - do
+            casGroup = Analyza1Model.objects.filter(casVytvoreniaTransakcie__range=[vstupy['cas']['od'], vstupy['cas']['do']])
+            print('CAS OD-DO',len(casGroup))
+        vystupy.update({'casHist': casGroup})
+
+    ## All together
+    
+    return vystupy
+
+def analysis(vystupy):
+    #products = pd.read_csv(file)
+    #print(products['vek'])
+    #X = df[['vek', 'casVypujceni']]
+    #y = df['ArlID']
+    #mymodel = numpy.poly1d(numpy.polyfit(products['vek'], products['casVypujceni'], 3))
+    #products.plot(kind = 'scatter', x = 'vek', y = 'casVypujceni')
+    #myline = numpy.linspace(0, 100, 4000)
+    #plt.scatter(products['vek'], products['casVypujceni'])
+    #plt.plot(myline, mymodel(myline))
+    #plt.hist2d(products['vek'], products['casVypujceni'])
+    #slope, intercept, r, p, std_err = stats.linregress(x, y)
+
+    #x = [1,2,3,5,6,7,8,9,10,12,13,14,15,16,18,19,21,22]
+    #y = [100,90,80,60,60,55,60,65,70,70,75,76,78,79,90,99,99,100]
+    #mymodel = numpy.poly1d(numpy.polyfit(x, y, 10))
+    #myline = numpy.linspace(1, 22, 100)
+    #plt.scatter(x, y)
+    #plt.plot(myline, mymodel(myline))
+
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png')
+    buffer.seek(0)
+    image_png = buffer.getvalue()
+    buffer.close()
+
+    graphic = base64.b64encode(image_png)
+    graphic = graphic.decode('utf-8')
+
+    #plt.show()
+
+def displayMarcXml(file):
+    records = parse_xml_to_array(file)
+    for record in records:
+        print(record.leader)
+        for field in record.get_fields():
+            if field.is_control_field():
+                print("controlField", field.tag, field.data)
+            else:
+                print("datafield", field.tag, field.indicators)
+                print("subfields:")
+                for k,v in dict(field.subfields_as_dict()).items():
+                    print(k, v)
+        print("--------------------------------")
+
 def defaultInicialization(column):
     row = {}
     #print(len(column))
@@ -320,7 +501,7 @@ def defaultInicialization(column):
     columnCounter += 1
     row.update({'Tcat_020q': column[columnCounter]})
     columnCounter += 1
-    if hasCommaOrDot(column[columnCounter]):
+    if hasDigitAndDot(column[columnCounter]):
         Tcat_020c = column[columnCounter]
         columnCounter += 1
         Tcat_020c = Tcat_020c + "," + column[columnCounter]
@@ -354,69 +535,3 @@ def defaultInicialization(column):
     columnCounter += 1
     row.update({'pocetUpominek': column[columnCounter]})
     return row
-
-def inicializeAnalyze1Tab(column, request):
-    row = {}
-    columnCounter = 0
-    columnCounter += 1
-    row.update({'tcreate': column[columnCounter]})
-    columnCounter += 10
-    if hasDigitAndDot(column[columnCounter]):
-        columnCounter += 1
-    columnCounter += 4
-    anonym = column[columnCounter]
-    if anonym == 0:
-        columnCounter += 1
-        row.update({'pohlavi': column[columnCounter]})
-    elif anonym == 1:
-        columnCounter += 1
-        row.update({'pohlavi': ""}) ## bez pohlavia
-    columnCounter += 1
-    row.update({'userHash': column[columnCounter]})
-    columnCounter += 2
-    if anonym == 0:
-        row.update({'psc': column[columnCounter]})
-        columnCounter += 1
-        row.update({'vek': column[columnCounter]})
-    elif anonym == 1:
-        row.update({'psc': ""})
-        columnCounter += 1
-        row.update({'vek': ""})
-    return validation(row, 1, request)
-
-def inicializeAnalyze2Tab(column):
-    return 
-
-def inicializeAnalyze3Tab(column):
-    return
-
-def analysis():
-    #products = pd.read_csv(file)
-    #print(products['vek'])
-    #X = df[['vek', 'casVypujceni']]
-    #y = df['ArlID']
-    #mymodel = numpy.poly1d(numpy.polyfit(products['vek'], products['casVypujceni'], 3))
-    #products.plot(kind = 'scatter', x = 'vek', y = 'casVypujceni')
-    #myline = numpy.linspace(0, 100, 4000)
-    #plt.scatter(products['vek'], products['casVypujceni'])
-    #plt.plot(myline, mymodel(myline))
-    #plt.hist2d(products['vek'], products['casVypujceni'])
-    #slope, intercept, r, p, std_err = stats.linregress(x, y)
-
-    #x = [1,2,3,5,6,7,8,9,10,12,13,14,15,16,18,19,21,22]
-    #y = [100,90,80,60,60,55,60,65,70,70,75,76,78,79,90,99,99,100]
-    #mymodel = numpy.poly1d(numpy.polyfit(x, y, 10))
-    #myline = numpy.linspace(1, 22, 100)
-    #plt.scatter(x, y)
-    #plt.plot(myline, mymodel(myline))
-
-    buffer = io.BytesIO()
-    plt.savefig(buffer, format='png')
-    buffer.seek(0)
-    image_png = buffer.getvalue()
-    buffer.close()
-
-    graphic = base64.b64encode(image_png)
-    graphic = graphic.decode('utf-8')
-
-    #plt.show()

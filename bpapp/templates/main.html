@@ -4,21 +4,21 @@
 {% block body %}
 <div class="btn-group buttonsCenter" role="group">
 	{% if analyzaId == 1 %}				 
-	<a href="{% url 'analyza' id=1 %}#subtab1" onclick="tab('#subtab1', 'href1')"><button class="btn btn-secondary buttonsSize currectPageStyle" type="button">
+	<a href="{% url 'analyza' id=1 %}"><button class="btn btn-secondary buttonsSize currectPageStyle" type="button">
 		Analýza 1
 	</button></a>
 	{% else %}
-	<a href="{% url 'analyza' id=1 %}#subtab1"><button class="btn btn-secondary buttonsSize" type="button">
+	<a href="{% url 'analyza' id=1 %}"><button class="btn btn-secondary buttonsSize" type="button">
 		Analýza 1
 	</button></a>
 	{% endif %}
 
 	{% if analyzaId == 2%}
-	<a href="{% url 'analyza' id=2 %}#subtab1"><button class="btn btn-secondary buttonsSize currectPageStyle" type="button">
+	<a href="{% url 'analyza' id=2 %}"><button class="btn btn-secondary buttonsSize currectPageStyle" type="button">
 		Analýza 2
 	</button></a> 
 	{% else %}
-	<a href="{% url 'analyza' id=2 %}#subtab1"><button class="btn btn-secondary buttonsSize" type="button">
+	<a href="{% url 'analyza' id=2 %}"><button class="btn btn-secondary buttonsSize" type="button">
 		Analýza 2
 	</button></a>
 	{% endif %}

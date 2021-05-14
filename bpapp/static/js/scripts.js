@@ -1,25 +1,18 @@
-$('#select-all').click(function(event) {   
-    if(this.checked) {
-        // Iterate each checkbox
-        $(':checkbox').each(function() {
-            this.checked = true;                        
-        });
-    } else {
-        $(':checkbox').each(function() {
-            this.checked = false;                       
-        });
+document.getElementById('select-age-all').onclick = function() {
+    var inputs = document.getElementsByTagName('input');
+    for (var input of inputs) {
+        if(input.name.startsWith('vek_')) {
+            input.checked = this.checked;
+        }
     }
-});
+}
 
-$('#select-age-all').click(function(event) {   
-    if(this.checked) {
-        // Iterate each checkbox
-        $(':checkbox').each(function() {
-            this.checked = true;                        
-        });
-    } else {
-        $(':checkbox').each(function() {
-            this.checked = false;                       
-        });
+
+document.getElementById('select-psc-all').onclick = function() {
+    var inputs = document.getElementsByTagName('input');
+    for (var input of inputs) {
+        if(input.name.startsWith('psc_')) {
+            input.checked = this.checked;
+        }
     }
-});
+}

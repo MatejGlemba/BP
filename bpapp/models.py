@@ -37,10 +37,6 @@ class Katalog(models.Model):
     katalog = models.TextField(null=True)
 
 # Číselníky
-class Pohlavie(models.Model):
-    id = models.IntegerField(primary_key=True)
-    pohlavie = models.CharField(max_length=4)
-
 class TypOperacie(models.Model):
     id = models.CharField(max_length=3, primary_key=True)
     nazov = models.CharField(max_length=25)
@@ -59,25 +55,34 @@ class VekovaSkupina(models.Model):
 
 # Modely analýz
 class Analyza1Model(models.Model):
-    id = models.IntegerField(primary_key=True)
-    pouzivatelId = models.CharField(max_length=50)
+    id = models.AutoField(primary_key=True)
+    pouzivatelId = models.CharField(max_length=150, null=True)
     vek = models.IntegerField()
-    pohlavie_id = models.ForeignKey(Pohlavie, on_delete=models.CASCADE)
+    pohlavie = models.CharField(max_length=4)
     psc_id = models.ForeignKey(PscObvodu, on_delete=models.CASCADE)
-    casVytvoreniaTransakcie = models.DateTimeField()
+    casVytvoreniaTransakcie = models.DateField()
+    
+    #def __init__(self, pouzivatelId: str or None, vek: int, pohlavie: str, casVytvoreniaTransakcie: str,
+    ##             psc_id: PscObvodu):
+     #   self.pouzivatelId = pouzivatelId
+     #   self.vek = vek
+     #   self.pohlavie = pohlavie
+     #   self.casVytvoreniaTransakcie = casVytvoreniaTransakcie
+     #   self.psc_id = psc_id
+       
 
 class Analyza2Model(models.Model):
-    id = models.IntegerField(primary_key=True)
+    id = models.AutoField(primary_key=True)
     transakciaId = models.IntegerField()
     typOperacie_id = models.ForeignKey(TypOperacie, on_delete=models.CASCADE)
-    casVytvoreniaTransakcie = models.DateTimeField()
+    casVytvoreniaTransakcie = models.DateField()
     dlzkaVypozicky = models.IntegerField()
     autor = models.CharField(max_length=50)
     vydavatelstvo = models.CharField(max_length=50)
     konspekt_id = models.ForeignKey(Konspekt, on_delete=models.CASCADE)
 
 class Analyza3Model(models.Model):
-    id = models.IntegerField(primary_key=True)
+    id = models.AutoField(primary_key=True)
     transakciaId = models.IntegerField()
     vekovaSkupina_id = models.ForeignKey(VekovaSkupina, on_delete=models.CASCADE)
     konspekt_id = models.ForeignKey(Konspekt, on_delete=models.CASCADE)
