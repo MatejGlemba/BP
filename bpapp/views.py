@@ -12,6 +12,9 @@ import xml.etree.ElementTree as ET
 from pymarc import MARCReader, parse_xml_to_array, Record
 import xmltodict, numpy as np, pandas as pd, matplotlib.pyplot as plt
 import matplotlib.pylab as plb
+import matplotlib.dates as mdates
+from matplotlib.dates import date2num
+from pylab import rcParams
 from scipy import stats
 from django.db.models import Q, Count
 from operator import or_
@@ -384,23 +387,32 @@ def spracujVstupy(request, id):
     ## Interval
     interval = {}
     if 'intervalRok' in postItems:
-        vstupy.update({'interval': 'rok'})
+        vstupy.update({'interval': YEARLY})
     elif 'intervalMesiac' in postItems:
-        vstupy.update({'interval': 'mesiac'})
+        vstupy.update({'interval': MONTHLY})
     elif 'intervalTyzden' in postItems:
-        vstupy.update({'interval': 'tyzden'})
+        vstupy.update({'interval': WEEKLY})
     elif 'intervalDen' in postItems:
-        vstupy.update({'interval': 'den'})
+        vstupy.update({'interval': DAILY})
     
     return vstupy
 
 def data_processing(vstupy, id):
     vystupy = {}
 
+    ## casovy interval
+    interval = None
+    if 'interval' in vstupy:
+        interval = vstupy['interval']
+    else:
+        interval = DAILY
+
+    print('Interval',interval)
+
     ## min and max time 
     maxDate = Analyza1Model.objects.all().values('casVytvoreniaTransakcie').order_by('-casVytvoreniaTransakcie')[0]
-    minDate = Analyza1Model.objects.all().values('casVytvoreniaTransakcie').order_by('casVytvoreniaTransakcie')[0]
-    dates = [dt.date() for dt in rrule(MONTHLY, dtstart=minDate['casVytvoreniaTransakcie'], until=maxDate['casVytvoreniaTransakcie'])]
+    minDate = Analyza1Model.objects.all().values('casVytvoreniaTransakcie').order_by('casVytvoreniaTransakcie')[0]  
+    dates = [dt.date() for dt in rrule(interval, dtstart=minDate['casVytvoreniaTransakcie'], until=maxDate['casVytvoreniaTransakcie'])]
 
     ## Histogramy
     histogramy = {}
@@ -438,83 +450,110 @@ def data_processing(vstupy, id):
         histCas.update({dates[date]:len(casGroup)})
     histogramy['histCas']=histCas
 
+
     ## Grafy
     grafy = {}
-
-    ## pohlavie
-    if 'pohlavie' in vstupy and len(vstupy['pohlavie']) == 1 and 'all' not in vstupy['pohlavie']:
-        pohlavieGroup = Analyza1Model.objects.all().filter(pohlavie=vstupy['pohlavie']['pohlavie']).distinct('pouzivatelId')
-        vystupy.update({'pohlavieHist': pohlavieGroup})
-        print('Pohlavie',len(pohlavieGroup))
-
-    ## Vekova skupina
+            
+    ## aggregate query filter
+    query = Q()
+    if 'pscObvodu' in vstupy and 'all' not in vstupy['vekovaSkupina']:
+        for k, v in dict(vstupy['pscObvodu']).items():
+            sk = PscObvodu.objects.get(psc=v) 
+            query = query | Q(psc_id=sk.psc)     
     if 'vekovaSkupina' in vstupy and 'all' not in vstupy['vekovaSkupina']:
-        query = Q()
         for k, v in dict(vstupy['vekovaSkupina']).items():
             sk = VekovaSkupina.objects.get(id=v)
             sk = sk.skupina.split('-')
             query = query | Q(vek__gte=sk[0],vek__lte=sk[1])
-        vekovaSkupinaGroup = Analyza1Model.objects.all().filter(query).distinct('pouzivatelId')
-        vystupy.update({'vekHist': vekovaSkupinaGroup})
-        print('VEK',len(vekovaSkupinaGroup))
-    
-    ## PSC
-    if 'pscObvodu' in vstupy and 'all' not in vstupy['vekovaSkupina']:
-        query = Q()
-        for k, v in dict(vstupy['pscObvodu']).items():
-            sk = PscObvodu.objects.get(psc=v) 
-            query = query | Q(psc_id=sk.psc)
-        pscGroup = Analyza1Model.objects.all().filter(query).distinct('pouzivatelId')
-        vystupy.update({'pscHist': pscGroup})
-        print('PSC',len(pscGroup))
+    if 'pohlavie' in vstupy and len(vstupy['pohlavie']) == 1 and 'all' not in vstupy['pohlavie']:
+        query = query | Q(pohlavie=vstupy['pohlavie']['pohlavie'])
+        
 
-    ## Cas
-    casGroup = None
+    dateIntervals = None
     if 'cas' in vstupy:
         if len(vstupy['cas']) == 1:
             if 'od' in vstupy['cas']:
                 ## od - do current datetime
-                casGroup = Analyza1Model.objects.filter(casVytvoreniaTransakcie__gte=vstupy['cas']['od'])
-                print('CAS OD',len(casGroup))
+                od = dt.datetime.strptime(vstupy['cas']['od'], '%Y-%m-%d')
+                dateIntervals = [dt.date() for dt in rrule(interval, dtstart=od, until=maxDate['casVytvoreniaTransakcie'])]
             else:
                 ## datetime < do
-                casGroup = Analyza1Model.objects.filter(casVytvoreniaTransakcie__lte=vstupy['cas']['do'])
-                print('CAS DO',len(casGroup))
+                do = dt.datetime.strptime(vstupy['cas']['do'], '%Y-%m-%d')
+                dateIntervals = [dt.date() for dt in rrule(interval, dtstart=minDate['casVytvoreniaTransakcie'], until=do)]      
         else:
             ## od - do
-            casGroup = Analyza1Model.objects.filter(casVytvoreniaTransakcie__range=[vstupy['cas']['od'], vstupy['cas']['do']])
-            print('CAS OD-DO',len(casGroup))
-        vystupy.update({'casHist': casGroup})
+            od = dt.datetime.strptime(vstupy['cas']['od'], '%Y-%m-%d')
+            do = dt.datetime.strptime(vstupy['cas']['do'], '%Y-%m-%d')
+            dateIntervals = [dt.date() for dt in rrule(interval, dtstart=od, until=do)]      
+    else:
+        ## od min - do max
+        dateIntervals = [dt.date() for dt in rrule(interval, dtstart=minDate['casVytvoreniaTransakcie'], until=maxDate['casVytvoreniaTransakcie'])]      
 
     
+    graf = {}
+    for dateInterval in range(len(dateIntervals)):
+        if dateInterval + 1 >= len(dateIntervals):
+            query = query | Q(casVytvoreniaTransakcie__gte=dateIntervals[dateInterval])
+        else:
+            query = query | Q(casVytvoreniaTransakcie__range=[dateIntervals[dateInterval], dateIntervals[dateInterval+1]])
+        # GET 
+        group = Analyza1Model.objects.all().filter(query).distinct('pouzivatelId')
+        graf.update({dateIntervals[dateInterval]:len(group)})
     
-    
-    
-    
-    
-    
+    grafy['graf']=graf
     
     ## All together
-    print(histogramy)
     vystupy.update({'histogramy':histogramy})
     vystupy.update({'grafy':grafy})
     return vystupy
 
+def to_integer(dt_time):
+    return dt_time.year + dt_time.month + dt_time.day
+
 def analysis(vystupy):
     #print(vystupy)
 
-
     # Polynomial regression
-    #cas = ['2020-10-18','2020-10-20','2020-10-22','2020-10-24','2020-10-26','2020-10-28','2020-10-30','2020-10-32','2020-10-34','2020-10-36','2020-10-38','2020-10-40','2020-10-42','2020-10-44','2020-10-46','2020-10-48','2020-10-50','2020-10-52']
-    #pocet = [100,90,80,60,60,55,60,65,70,70,75,76,78,79,90,99,99,100]
+    for k,graf in vystupy['grafy'].items():
+        z = list(graf.keys())
+        y = list(graf.values())
+        x = []
+        for a in z:
+            x.append(to_integer(a))
 
-    #mymodel = np.poly1d(np.polyfit(cas, pocet, 3))
-    #myline = np.linspace(1, 22, 100)
-    #plt.scatter(cas, pocet)
-    #plt.plot(myline, mymodel(myline))
-    #plt.show()
+        mymodel = np.poly1d(np.polyfit(y, x, 3))
+        myline = np.linspace(1, 22, 100)
+        plt.scatter(y, x)
+        plt.plot(myline, mymodel(myline))
+        plt.show()
+        
+        
+        plt.scatter(x, y)
+        plt.show()
+        
+        slope, intercept, r, p, std_err = stats.linregress(x, y)
+        def myfunc(x):
+            return slope * x + intercept
+        mymodel = list(map(myfunc, x))
+        plt.scatter(x, y)
+        plt.plot(y, mymodel)
+        plt.show()
 
+        DF = pd.DataFrame({
+            'day':     x,
+            'balance': y
+        })
+        rcParams['figure.figsize'] = 20, 10
+        fig, ax = plt.subplots()
+        DF['day'] = DF['day'].apply(date2num)      #-->Update
 
+        ax.bar(DF['day'], DF['balance'], color='lightblue')
+        plt.xlabel('day', fontsize=20)
+        myFmt = mdates.DateFormatter('%Y-%m')
+        ax.xaxis.set_major_formatter(myFmt)
+        plt.show()
+
+    
     # make up some dat
     #z = []
     #for c in cas:
@@ -584,7 +623,7 @@ def defaultInicialization(column):
     columnCounter = 0
     row.update({'ArlID': column[columnCounter]})
     columnCounter += 1
-    createTime = datetime.strptime(column[columnCounter], '"%Y%m%d%H%M%S.%f"')
+    createTime = dt.strptime(column[columnCounter], '"%Y%m%d%H%M%S.%f"')
     row.update({'tcreate': createTime})
     columnCounter += 1
     row.update({'idRow': column[columnCounter]})
