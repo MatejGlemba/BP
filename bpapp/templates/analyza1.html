@@ -20,7 +20,7 @@
                 <a class="nav-link" href="#subtab2" data-toggle="tab">Úprava vstupov</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="#subtab3" data-toggle="tab">Analyzuj</a>
+                <a class="nav-link" href="{% url 'analyzaVystup' id=1 id2='analyza' %}#subtab3" data-toggle="tab">Analyzuj</a>
             </li>
         </ul>
     </div>
@@ -179,7 +179,7 @@
                                 <div class="form-group">
                                     <label>OD:</label>
                                     <div class='input-group date' id='datetimepicker6'>
-                                    <input type="date" placeholder="" id="birthday" name="od">
+                                    <input type="date" placeholder="" name="od">
                                    </div>
                                 </div>
                             </div>
@@ -187,8 +187,23 @@
                                 <div class="form-group">
                                     <label>DO:</label>
                                     <div class='input-group date' id='datetimepicker7'>
-                                    <input type="date" placeholder="" id="birthday" name="do">
+                                    <input type="date" placeholder="" name="do">
                                    </div>
+                                </div>
+                            </div> 
+                            <div class='col-md-4'>
+                                <div class="form-group">
+                                    <label>Rozdelenie</label>
+                                    <div>
+                                        <label>
+                                          <input type="checkbox" class="radio" value="1" name="intervalRok" />Ročne</label>
+                                        <label>
+                                          <input type="checkbox" class="radio" value="1" name="intervalMesiac" />Mesačne</label>
+                                        <label>
+                                          <input type="checkbox" class="radio" value="1" name="intervalTyzden" />Týždenne</label>
+                                        <label>
+                                          <input type="checkbox" class="radio" value="1" name="intervalDen" />Denne</label>
+                                      </div>
                                 </div>
                             </div> 
                         </div> 

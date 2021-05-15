@@ -7,18 +7,21 @@ from django.urls import reverse
 from django.contrib.sessions.models import Session 
 import csv, io, os, base64, random
 from django.core.paginator import Paginator
-from datetime import datetime
+import datetime as dt
 import xml.etree.ElementTree as ET
 from pymarc import MARCReader, parse_xml_to_array, Record
-import xmltodict, numpy, pandas as pd, matplotlib.pyplot as plt
+import xmltodict, numpy as np, pandas as pd, matplotlib.pyplot as plt
+import matplotlib.pylab as plb
 from scipy import stats
-from django.db.models import Q
+from django.db.models import Q, Count
 from operator import or_
 from functools import reduce
+from dateutil.rrule import rrule, MONTHLY, YEARLY, WEEKLY, DAILY
 
 
 user = {}
 importData = None
+vystupyData = None
 xmlCat = None
 csvFile = None
 
@@ -96,6 +99,7 @@ def analyza(request, id):
 
 def analyzaVystup(request, id, id2):
     global importData
+    global vystupyData
     if user:
         if id == 1: 
             if id2 == 'import' and request.method == 'POST':
@@ -109,9 +113,10 @@ def analyzaVystup(request, id, id2):
                 importData = Analyza1Model.objects.all()
             elif id2 == 'uprava' and request.method == 'POST':
                 vstupy = spracujVstupy(request, id)
-                importData2 = data_processing(vstupy, id)
-            elif id2 == 'analyza' and request.method == 'POST':
-                id2Flag = id2
+                vystupyData = data_processing(vstupy, id)
+                analysis(vystupyData)
+            elif id2 == 'analyza':
+                analysis(vystupyData)
             paginator = Paginator(importData, 5)
             page = request.GET.get('page', 1)
             data = paginator.page(page)
@@ -185,7 +190,7 @@ def inicializaciaCiselnikov():
     v.save()
     v = VekovaSkupina()
     setattr(v, 'id', 6)
-    setattr(v, 'skupina', "71+")
+    setattr(v, 'skupina', "71-100")
     v.save()
 
 def xmlFile(file, id, request):
@@ -333,7 +338,7 @@ def putIntoDB(rows, id):
 def spracujVstupy(request, id):
     vstupy = {}
     postItems = dict(request.POST.items())
-    
+   
     ## Pohlavie
     pohlavie = {}
     if 'pohlavieM' in postItems:
@@ -375,17 +380,73 @@ def spracujVstupy(request, id):
         cas.update({'do': postItems['do']})
     if cas:
         vstupy.update({'cas': cas})
+
+    ## Interval
+    interval = {}
+    if 'intervalRok' in postItems:
+        vstupy.update({'interval': 'rok'})
+    elif 'intervalMesiac' in postItems:
+        vstupy.update({'interval': 'mesiac'})
+    elif 'intervalTyzden' in postItems:
+        vstupy.update({'interval': 'tyzden'})
+    elif 'intervalDen' in postItems:
+        vstupy.update({'interval': 'den'})
     
     return vstupy
 
 def data_processing(vstupy, id):
     vystupy = {}
+
+    ## min and max time 
+    maxDate = Analyza1Model.objects.all().values('casVytvoreniaTransakcie').order_by('-casVytvoreniaTransakcie')[0]
+    minDate = Analyza1Model.objects.all().values('casVytvoreniaTransakcie').order_by('casVytvoreniaTransakcie')[0]
+    dates = [dt.date() for dt in rrule(MONTHLY, dtstart=minDate['casVytvoreniaTransakcie'], until=maxDate['casVytvoreniaTransakcie'])]
+
+    ## Histogramy
+    histogramy = {}
+
+    ## hist pohlavie
+    histPohlavieQ = Analyza1Model.objects.values('pohlavie').annotate(dcount=Count('*')).order_by()
+    histPohlavie = {}
+    for h in histPohlavieQ:
+        histPohlavie.update({h['pohlavie'] : h['dcount']})
+    histogramy['histPohlavie'] = histPohlavie
+
+    ## hist vekova skupina
+    histVek = {}
+    for vek in VekovaSkupina.objects.all():
+        sk = vek.skupina.split('-')
+        vekovaSkupinaGroup = Analyza1Model.objects.all().filter(Q(vek__gte=sk[0],vek__lte=sk[1])).distinct('pouzivatelId')
+        histVek.update({vek.skupina:len(vekovaSkupinaGroup)})
+    histogramy['histVek']=histVek
+
+    ## hist psc 
+    histPscQ = Analyza1Model.objects.values('psc_id').annotate(dcount=Count('*')).order_by()
+    histPsc = {}
+    for h in histPscQ:
+        obv = PscObvodu.objects.get(psc=h['psc_id'])
+        histPsc.update({obv.obvod : h['dcount']})
+    histogramy['histPsc'] = histPsc
+
+    ## hist cas
+    histCas = {}
+    for date in range(len(dates)):
+        if date + 1 >= len(dates):
+            casGroup = Analyza1Model.objects.all().filter(casVytvoreniaTransakcie__gte=dates[date])
+        else:
+            casGroup = Analyza1Model.objects.all().filter(casVytvoreniaTransakcie__range=[dates[date], dates[date+1]])
+        histCas.update({dates[date]:len(casGroup)})
+    histogramy['histCas']=histCas
+
+    ## Grafy
+    grafy = {}
+
     ## pohlavie
     if 'pohlavie' in vstupy and len(vstupy['pohlavie']) == 1 and 'all' not in vstupy['pohlavie']:
-        pohlavieGroup = Analyza1Model.objects.filter(pohlavie=vstupy['pohlavie']['pohlavie']).values('pouzivatelId').distinct()
+        pohlavieGroup = Analyza1Model.objects.all().filter(pohlavie=vstupy['pohlavie']['pohlavie']).distinct('pouzivatelId')
         vystupy.update({'pohlavieHist': pohlavieGroup})
         print('Pohlavie',len(pohlavieGroup))
-    
+
     ## Vekova skupina
     if 'vekovaSkupina' in vstupy and 'all' not in vstupy['vekovaSkupina']:
         query = Q()
@@ -393,7 +454,7 @@ def data_processing(vstupy, id):
             sk = VekovaSkupina.objects.get(id=v)
             sk = sk.skupina.split('-')
             query = query | Q(vek__gte=sk[0],vek__lte=sk[1])
-        vekovaSkupinaGroup = Analyza1Model.objects.filter(query).values('pouzivatelId').distinct()
+        vekovaSkupinaGroup = Analyza1Model.objects.all().filter(query).distinct('pouzivatelId')
         vystupy.update({'vekHist': vekovaSkupinaGroup})
         print('VEK',len(vekovaSkupinaGroup))
     
@@ -403,7 +464,7 @@ def data_processing(vstupy, id):
         for k, v in dict(vstupy['pscObvodu']).items():
             sk = PscObvodu.objects.get(psc=v) 
             query = query | Q(psc_id=sk.psc)
-        pscGroup = Analyza1Model.objects.filter(query).values('pouzivatelId').distinct()
+        pscGroup = Analyza1Model.objects.all().filter(query).distinct('pouzivatelId')
         vystupy.update({'pscHist': pscGroup})
         print('PSC',len(pscGroup))
 
@@ -425,11 +486,54 @@ def data_processing(vstupy, id):
             print('CAS OD-DO',len(casGroup))
         vystupy.update({'casHist': casGroup})
 
-    ## All together
     
+    
+    
+    
+    
+    
+    
+    
+    ## All together
+    print(histogramy)
+    vystupy.update({'histogramy':histogramy})
+    vystupy.update({'grafy':grafy})
     return vystupy
 
 def analysis(vystupy):
+    #print(vystupy)
+
+
+    # Polynomial regression
+    #cas = ['2020-10-18','2020-10-20','2020-10-22','2020-10-24','2020-10-26','2020-10-28','2020-10-30','2020-10-32','2020-10-34','2020-10-36','2020-10-38','2020-10-40','2020-10-42','2020-10-44','2020-10-46','2020-10-48','2020-10-50','2020-10-52']
+    #pocet = [100,90,80,60,60,55,60,65,70,70,75,76,78,79,90,99,99,100]
+
+    #mymodel = np.poly1d(np.polyfit(cas, pocet, 3))
+    #myline = np.linspace(1, 22, 100)
+    #plt.scatter(cas, pocet)
+    #plt.plot(myline, mymodel(myline))
+    #plt.show()
+
+
+    # make up some dat
+    #z = []
+    #for c in cas:
+    #    z.append(dt.datetime.strptime(c, '%Y-%m-%d'))
+    #x = [dt.datetime.now() + dt.timedelta(hours=i) for i in range(12)]
+    #y = [i+random.gauss(0,1) for i,_ in enumerate(cas)]
+
+    #print(z)
+    # plot
+    #plt.plot(cas,y)
+    # beautify the x-labels
+    #plt.gcf().autofmt_xdate()
+    #plt.show()
+
+    print(vystupy['histogramy'])
+    for k,v in vystupy['histogramy'].items():
+        plt.bar(v.keys(), v.values(), color='g')
+        plt.show()
+
     #products = pd.read_csv(file)
     #print(products['vek'])
     #X = df[['vek', 'casVypujceni']]
@@ -449,14 +553,14 @@ def analysis(vystupy):
     #plt.scatter(x, y)
     #plt.plot(myline, mymodel(myline))
 
-    buffer = io.BytesIO()
-    plt.savefig(buffer, format='png')
-    buffer.seek(0)
-    image_png = buffer.getvalue()
-    buffer.close()
+    #buffer = io.BytesIO()
+    #plt.savefig(buffer, format='png')
+    #buffer.seek(0)
+    #image_png = buffer.getvalue()
+    #buffer.close()
 
-    graphic = base64.b64encode(image_png)
-    graphic = graphic.decode('utf-8')
+    #graphic = base64.b64encode(image_png)
+    #graphic = graphic.decode('utf-8')
 
     #plt.show()
 
