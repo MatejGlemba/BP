@@ -12,7 +12,8 @@ import xml.etree.ElementTree as ET
 from pymarc import MARCReader, parse_xml_to_array, Record
 import xmltodict, numpy as np, pandas as pd, matplotlib.pyplot as plt
 import matplotlib.pylab as plb
-import matplotlib.dates as mdates
+#import matplotlib.dates as mdates
+import matplotlib
 from matplotlib.dates import date2num
 from pylab import rcParams
 from scipy import stats
@@ -222,8 +223,8 @@ def csvFile(file, id, request):
             elif id == 3:
                 rows[rowCounter] = inicializeAnalyze3Tab(column)
             rowCounter += 1
-        else:
-            messages.error(request, 'File has more than 26 columns !')
+        #else:
+        #    messages.error(request, 'File has more than 26 columns !')
     putIntoDB(rows, id)
 
 def inicializeAnalyze1Tab(column, request):
@@ -245,7 +246,7 @@ def inicializeAnalyze1Tab(column, request):
     ## pohlavie
     anonym = column[columnCounter]
     columnCounter += 1
-    if len(anonym) == 3 and anonym[1].isdigit() and int(anonym[1]) in (0, 1):
+    if len(anonym) == 3 and anonym[1].isdigit() and int(anonym[1]) in [0, 1]:
         anonym = int(anonym[1])
         pohlavie = column[columnCounter]
         if anonym == 0:
@@ -266,6 +267,7 @@ def inicializeAnalyze1Tab(column, request):
                 pohlavie = "muz"
             row.update({'pohlavie': pohlavie})
     else:
+        anonym = 1
         r = random.randint(0,1)
         if r == 0:
             pohlavie = "zena"
@@ -491,13 +493,14 @@ def data_processing(vstupy, id):
 
     
     graf = {}
+    queryTime = Q()
     for dateInterval in range(len(dateIntervals)):
         if dateInterval + 1 >= len(dateIntervals):
-            query = query | Q(casVytvoreniaTransakcie__gte=dateIntervals[dateInterval])
+            queryTime = Q(casVytvoreniaTransakcie__gte=dateIntervals[dateInterval])
         else:
-            query = query | Q(casVytvoreniaTransakcie__range=[dateIntervals[dateInterval], dateIntervals[dateInterval+1]])
+            queryTime = Q(casVytvoreniaTransakcie__range=[dateIntervals[dateInterval], dateIntervals[dateInterval+1]])
         # GET 
-        group = Analyza1Model.objects.all().filter(query).distinct('pouzivatelId')
+        group = Analyza1Model.objects.all().filter(query).filter(queryTime).distinct('pouzivatelId')
         graf.update({dateIntervals[dateInterval]:len(group)})
     
     grafy['graf']=graf
@@ -507,101 +510,156 @@ def data_processing(vstupy, id):
     vystupy.update({'grafy':grafy})
     return vystupy
 
-def to_integer(dt_time):
-    return dt_time.year + dt_time.month + dt_time.day
-
 def analysis(vystupy):
-    #print(vystupy)
+    path = 'bpapp/graphs/analyza1/'
 
-    # Polynomial regression
+    ## Hlavne Grafy
     for k,graf in vystupy['grafy'].items():
-        z = list(graf.keys())
         y = list(graf.values())
         x = []
-        for a in z:
-            x.append(to_integer(a))
+        for key in list(graf.keys()):
+            x.append(key.strftime("%m/%d/%Y"))
+        x = matplotlib.dates.datestr2num(x)
+        
+        
 
-        mymodel = np.poly1d(np.polyfit(y, x, 3))
-        myline = np.linspace(1, 22, 100)
-        plt.scatter(y, x)
-        plt.plot(myline, mymodel(myline))
-        plt.show()
-        
-        
+        ## -------------------------------
+        plt.bar(graf.keys(), graf.values(), color='g')
+        #plt.show()
+        plt.gcf().autofmt_xdate()
+        plt.savefig(path + 'mainHist.png')
+        plt.close()
+        ## ------------------------------------------------------------
+        ## Polynomial MOJ
+        maxValue = max(y)
+        lenX = len(x)
+        mymodel = np.poly1d(np.polyfit(x, y, 3))
+        myline = np.linspace(x[0], x[lenX-1], 10)
+        fig, ax = plt.subplots() 
         plt.scatter(x, y)
-        plt.show()
-        
+        plt.plot(myline, mymodel(myline))
+        l = matplotlib.dates.AutoDateLocator()
+        f = matplotlib.dates.AutoDateFormatter(l)
+        ax.xaxis.set_major_locator(l)
+        ax.xaxis.set_major_formatter(f)
+        #plt.show()
+        plt.gcf().autofmt_xdate()
+        plt.savefig(path + 'polyMain.png')
+        plt.close()
+        #--------------------------------------------------
+        ## POlynomial PRIKLAD
+        a = [97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108]
+        #a = [1,2,3,5,6,7,8,9,10,12,13,14,15,16,18,19,21,22]
+        b = [100,90,80,60,60,55,60,65,70,70,75,76]
+        bMax = max(b)
+        mymodel = np.poly1d(np.polyfit(a, b, 3))
+
+        myline = np.linspace(97, 108, bMax)
+
+        plt.scatter(a, b)
+        plt.plot(myline, mymodel(myline))
+        #plt.show()
+        plt.gcf().autofmt_xdate()
+        plt.savefig(path + 'polyEx1.png')
+        plt.close()
+        ## -------------------------------------------------------
+        ## Polynomial Date Priklad
+
+        idx_1 = dt.datetime(2017,6,7,0,0,0)
+        idx_2 = dt.datetime(2017,7,27,0,0,0)
+        idx_3 = dt.datetime(2017,7,28,0,0,0)
+        idx_4 = dt.datetime(2017,7,30,0,0,0)
+        idx_5 = dt.datetime(2017,8,3,0,0,0)
+        idx_6 = dt.datetime(2017,8,7,0,0,0)
+
+        idx = [idx_1, idx_2, idx_3, idx_4, idx_5, idx_6]
+
+        y1 = 155.98
+        y2 = 147.07
+        y3 = 140.07
+        y4 = 167.07
+        y5 = 197.07
+        y6 = 137.07
+
+        a = []
+        b = []
+        a = matplotlib.dates.date2num(idx)
+        b = [y1, y2, y3, y4, y5, y6]
+        #Difference = x[1] - x[0] #this helps to end the plotted line at specific point
+        coefficients = np.polyfit(a, b, 3) ## Degree of the fitting polynomial
+        polynomial = np.poly1d(coefficients)
+        # the np.linspace lets you set number of data points, line length.
+        #x_axis = np.linspace(x[0], x[1] + Difference, 3)  # linspace(start, end, num)
+        x_axis = np.linspace(a[0], a[5], 10) ## 10- rozptyl na y-osi
+        y_axis = polynomial(x_axis)
+        plt.plot(x_axis, y_axis)
+        plt.scatter(a, b)
+        #plt.plot(a[0], b[0], 'go')
+        #plt.plot(a[1], b[1], 'go')
+
+        loc= matplotlib.dates.AutoDateLocator()
+        plt.gca().xaxis.set_major_locator(loc)
+        plt.gca().xaxis.set_major_formatter(matplotlib.dates.AutoDateFormatter(loc))
+        plt.gcf().autofmt_xdate()
+        #plt.show()
+        plt.gcf().autofmt_xdate()
+        plt.savefig(path + 'polyEx2.png')
+        plt.close()
+        ## -------------------------------------------------------------------------
+        ## linear MOJ
         slope, intercept, r, p, std_err = stats.linregress(x, y)
         def myfunc(x):
             return slope * x + intercept
         mymodel = list(map(myfunc, x))
-        plt.scatter(x, y)
-        plt.plot(y, mymodel)
-        plt.show()
-
-        DF = pd.DataFrame({
-            'day':     x,
-            'balance': y
-        })
-        rcParams['figure.figsize'] = 20, 10
         fig, ax = plt.subplots()
-        DF['day'] = DF['day'].apply(date2num)      #-->Update
-
-        ax.bar(DF['day'], DF['balance'], color='lightblue')
-        plt.xlabel('day', fontsize=20)
-        myFmt = mdates.DateFormatter('%Y-%m')
-        ax.xaxis.set_major_formatter(myFmt)
-        plt.show()
-
+        ax.scatter(x, y)
+        ax.plot(x, mymodel)
+        # instruct matplotlib on how to convert the numbers back into dates for the x-axis
+        l = matplotlib.dates.AutoDateLocator()
+        f = matplotlib.dates.AutoDateFormatter(l)
+        ax.xaxis.set_major_locator(l)
+        ax.xaxis.set_major_formatter(f)
+        #plt.show()
+        plt.gcf().autofmt_xdate()
+        plt.savefig(path + 'linMain.png')
+        plt.close()
+        ## --------------------------------------------------------------------------------
+        ## LINEAR PRIKLAD
+        x = ['01/01/2019', '01/02/2019', '01/03/2019', '01/04/2019', '01/05/2019', '01/06/2019', '01/07/2019', '01/08/2019', '01/09/2019', '01/10/2019', '01/11/2019', '01/12/2019']
+        y = [12050, 17044, 14066, 16900, 19979, 17593, 14058, 16003, 15095, 12785, 12886, 20008]
+        # convert the dates to a number, using the datetime module
+        #x = [dt.datetime.strptime(i, '%M/%d/%Y').toordinal() for i in x]
+       # print('x---',x)
+        x = matplotlib.dates.datestr2num(x)
+        #print('X-NOVE-',x)
+        slope, intercept, r, p, std_err = stats.linregress(x, y)
+        def myfunc(x):
+            return slope * x + intercept
+        mymodel = list(map(myfunc, x))
+        fig, ax = plt.subplots()
+        ax.scatter(x, y)
+        ax.plot(x, mymodel)
+        # instruct matplotlib on how to convert the numbers back into dates for the x-axis
+        l = matplotlib.dates.AutoDateLocator()
+        f = matplotlib.dates.AutoDateFormatter(l)
+        ax.xaxis.set_major_locator(l)
+        ax.xaxis.set_major_formatter(f)
+        plt.gcf().autofmt_xdate()
+        plt.suptitle('Linearna regresia', fontsize=20)
+        plt.xlabel('Datum', fontsize=18)
+        plt.ylabel('Pocet', fontsize=16)
+        plt.savefig(path + 'linEx.png')
+        plt.close()
     
-    # make up some dat
-    #z = []
-    #for c in cas:
-    #    z.append(dt.datetime.strptime(c, '%Y-%m-%d'))
-    #x = [dt.datetime.now() + dt.timedelta(hours=i) for i in range(12)]
-    #y = [i+random.gauss(0,1) for i,_ in enumerate(cas)]
-
-    #print(z)
-    # plot
-    #plt.plot(cas,y)
-    # beautify the x-labels
-    #plt.gcf().autofmt_xdate()
-    #plt.show()
-
-    print(vystupy['histogramy'])
+    # POMOCNE HISTOGRAMY
+    inc = 1
     for k,v in vystupy['histogramy'].items():
         plt.bar(v.keys(), v.values(), color='g')
-        plt.show()
-
-    #products = pd.read_csv(file)
-    #print(products['vek'])
-    #X = df[['vek', 'casVypujceni']]
-    #y = df['ArlID']
-    #mymodel = numpy.poly1d(numpy.polyfit(products['vek'], products['casVypujceni'], 3))
-    #products.plot(kind = 'scatter', x = 'vek', y = 'casVypujceni')
-    #myline = numpy.linspace(0, 100, 4000)
-    #plt.scatter(products['vek'], products['casVypujceni'])
-    #plt.plot(myline, mymodel(myline))
-    #plt.hist2d(products['vek'], products['casVypujceni'])
-    #slope, intercept, r, p, std_err = stats.linregress(x, y)
-
-    #x = [1,2,3,5,6,7,8,9,10,12,13,14,15,16,18,19,21,22]
-    #y = [100,90,80,60,60,55,60,65,70,70,75,76,78,79,90,99,99,100]
-    #mymodel = numpy.poly1d(numpy.polyfit(x, y, 10))
-    #myline = numpy.linspace(1, 22, 100)
-    #plt.scatter(x, y)
-    #plt.plot(myline, mymodel(myline))
-
-    #buffer = io.BytesIO()
-    #plt.savefig(buffer, format='png')
-    #buffer.seek(0)
-    #image_png = buffer.getvalue()
-    #buffer.close()
-
-    #graphic = base64.b64encode(image_png)
-    #graphic = graphic.decode('utf-8')
-
-    #plt.show()
+        nazov = path + 'histPart' + str(inc) + '.png'
+        plt.gcf().autofmt_xdate()
+        plt.savefig(nazov)
+        plt.close()
+        inc += 1
 
 def displayMarcXml(file):
     records = parse_xml_to_array(file)
