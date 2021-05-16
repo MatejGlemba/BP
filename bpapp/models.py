@@ -53,10 +53,10 @@ class VekovaSkupina(models.Model):
 class Analyza1Model(models.Model):
     id = models.AutoField(primary_key=True)
     pouzivatelId = models.CharField(max_length=150, null=True)
-    vek = models.IntegerField()
-    pohlavie = models.CharField(max_length=4)
-    psc_id = models.ForeignKey(PscObvodu, on_delete=models.CASCADE)
-    casVytvoreniaTransakcie = models.DateField()
+    vek = models.IntegerField(null=True)
+    pohlavie = models.CharField(max_length=4, null=True)
+    psc_id = models.ForeignKey(PscObvodu, on_delete=models.CASCADE, null=True)
+    casVytvoreniaTransakcie = models.DateField(null=True)
            
 class Analyza2Model(models.Model):
     id = models.AutoField(primary_key=True)

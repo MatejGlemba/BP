@@ -155,10 +155,10 @@ def analyzaVystup(request, id):
             if request.method == 'POST':
                 vstupy = spracujVstupy(request, id)
                 makeLog("Vstupy do analýzy boli spracované")
-                vystupy = data_processing(vstupy, id)
+                vystupy = spracovanieDat(vstupy, id)
                 vystupyData = vystupy['output'] 
                 makeLog("Dáta na základe vstupov boli agregované")
-                graphs = analysis(vystupy)
+                graphs = analyzaDat(vystupy)
                 makeLog("Výstupné sústavy z analýzy boli vytvorené")
             paginator = Paginator(vystupyData, 5)
             page = request.GET.get('page', 1)
@@ -256,69 +256,64 @@ def csvFile(file, id, request):
     next(io_string) 
     rows = {}
     rowCounter = 0
-    for column in csv.reader(io_string, delimiter=',', quotechar="|"):
-        if len(column) <= 26:
+    for row in csv.reader(io_string, delimiter=',', quotechar="|"):
+        if len(row) <= 26:
             if id == 1:
-                rows[rowCounter] = inicializeAnalyze1Tab(column, request)
+                rows[rowCounter] = validujDataAnal1(row, request)
             elif id == 2:
-                rows[rowCounter] = inicializeAnalyze2Tab(column)
+                rows[rowCounter] = validujDataAnal2(row)
             elif id == 3:
-                rows[rowCounter] = inicializeAnalyze3Tab(column)
+                rows[rowCounter] = validujDataAnal3(row)
             rowCounter += 1
         #else:
         #    messages.error(request, 'File has more than 26 columns !')
     makeLog("Dáta z CSV súboru boli úspešne validované")
-    putIntoDB(rows, id)
+    vlozDoDB(rows, id)
 
-def inicializeAnalyze1Tab(column, request):
-    row = {}
+def validujDataAnal1(row, request):
+    rowDict = {}
 
     ## tcraete
     columnCounter = 1 
-    tcreate = column[columnCounter]
-    print('TCREATE',tcreate)
+    tcreate = row[columnCounter]
     if len(tcreate) == 18 and tcreate[15] == '.' and tcreate[1:9].isdigit():
         tcreate = tcreate[1:5] + '-' + tcreate[5:7] + '-' + tcreate[7:9]
-        row.update({'casVytvoreniaTransakcie': tcreate})
+        rowDict.update({'casVytvoreniaTransakcie': tcreate})
     else:
         messages.error(request, 'Wrong form of tcreate field')
     
     columnCounter += 10
-    if hasDigit(column[columnCounter]) and hasDigit(column[columnCounter + 1]) and len(column[columnCounter+1]) == 3: ## "285 Kč" 
+    if hasDigit(row[columnCounter]) and hasDigit(row[columnCounter + 1]) and len(row[columnCounter+1]) == 3: ## "285 Kč" 
         columnCounter += 1
     columnCounter += 4
 
     ## pohlavie
-    anonym = column[columnCounter]
-    print('ANONYM',anonym)
+    anonym = row[columnCounter]
     columnCounter += 1
     if len(anonym) == 3 and anonym[1].isdigit() and int(anonym[1]) in [0, 1]:
         anonym = int(anonym[1])
-        pohlavie = column[columnCounter]
-        print('POHHLAVIE',pohlavie)
+        pohlavie = row[columnCounter]
         if anonym == 0:
             if pohlavie.isalpha() and len(pohlavie) > 2 and len(pohlavie) < 7 and pohlavie in ["zena", "muz"]:
-                row.update({'pohlavie': pohlavie})
+                rowDict.update({'pohlavie': pohlavie})
             else:
-                row.update({'pohlavie': ''})
+                rowDict.update({'pohlavie': ''})
         elif anonym == 1:
-            row.update({'pohlavie': ''})
+            rowDict.update({'pohlavie': ''})
     else:
-        row.update({'pohlavie': ''})
+        rowDict.update({'pohlavie': ''})
 
     ## userHash
     columnCounter += 1
-    userHash = column[columnCounter]
-    print('HASH',userHash)
+    userHash = row[columnCounter]
     if userHash:
-        row.update({'pouzivatelId': userHash})
+        rowDict.update({'pouzivatelId': userHash})
     else:
         messages.error(request, 'Missing UserHash field')
 
     ## psc
     columnCounter += 2
-    pscOld = column[columnCounter]
-    print('PSC',pscOld)
+    pscOld = row[columnCounter]
     if len(pscOld) == 8 and pscOld[4] == " ":
         psc = pscOld[1:7]
         psc = psc.replace(' ', '')
@@ -329,39 +324,38 @@ def inicializeAnalyze1Tab(column, request):
             except:
                 obv = PscObvodu.objects.get(psc=99999)
                 #messages.error(request, 'Wrong form of psc field [Not digit]')
-            row.update({'psc_id': obv})
+            rowDict.update({'psc_id': obv})
         else:
             #messages.error(request, 'Wrong form of psc field [Not digit]')
-            row.update({'psc_id': PscObvodu.objects.get(psc=99999)})
+            rowDict.update({'psc_id': PscObvodu.objects.get(psc=99999)})
     else:
         #messages.error(request, 'Wrong form of psc field')
-        row.update({'psc_id': PscObvodu.objects.get(psc=99999)})
+        rowDict.update({'psc_id': PscObvodu.objects.get(psc=99999)})
     
     ## vek
     columnCounter += 1
     if anonym == 0: 
-        print('PSC',column[columnCounter])
-        vek = column[columnCounter].replace('"', '')
+        vek = row[columnCounter].replace('"', '')
         if vek.isdigit() and int(vek) >= 0:   
-            row.update({'vek': int(vek)})
+            rowDict.update({'vek': int(vek)})
         else:
-            row.update({'vek': 0})
+            rowDict.update({'vek': 0})
             #messages.error(request, 'Wrong form of vek field')
     elif anonym == 1:
-        row.update({'vek': 0})
+        rowDict.update({'vek': 0})
     
-    return row
+    return rowDict
 
-def inicializeAnalyze2Tab(column):
+def validujDataAnal2(column):
     return 
 
-def inicializeAnalyze3Tab(column):
+def validujDataAnal3(column):
     return
 
 def hasDigit(inputString):
     return any(char.isdigit() for char in inputString)
 
-def putIntoDB(rows, id):
+def vlozDoDB(rows, id):
     for key, value in rows.items():
         if id == 1: ## Store model for analyza1
             obj = Analyza1Model()
@@ -373,15 +367,13 @@ def putIntoDB(rows, id):
         elif id == 3: ## Store model for analyza1
             obj = Analyza3Model()
     makeLog("Dáta boli úspešne uložené v databáze")
-    putVekAndPohlavieInMissingFields()
+    doplnVekAPohlavie()
 
-def putVekAndPohlavieInMissingFields():
+def doplnVekAPohlavie():
     ## Put vek
     makeLog("Pridáva sa vek na voľné miesta podľa užívateľov")
     allTransactions = Analyza1Model.objects.all().values('pouzivatelId').distinct('pouzivatelId')
-    print(len(allTransactions))
     for transaction in allTransactions:
-        print(transaction)
         objects = Analyza1Model.objects.filter(pouzivatelId=transaction['pouzivatelId'], vek=0)
         vek = random.randint(15,80)
         for obj in objects:
@@ -459,7 +451,7 @@ def spracujVstupy(request, id):
     
     return vstupy
 
-def data_processing(vstupy, id):
+def spracovanieDat(vstupy, id):
     vystupy = {}
 
     ## casovy interval
@@ -501,12 +493,20 @@ def data_processing(vstupy, id):
 
     ## hist cas
     histCas = {}
-    for date in range(len(dates)):
-        if date + 1 >= len(dates):
-            casGroup = Analyza1Model.objects.all().filter(casVytvoreniaTransakcie__gte=dates[date])
-        else:
-            casGroup = Analyza1Model.objects.all().filter(casVytvoreniaTransakcie__range=[dates[date], dates[date+1]])
-        histCas.update({dates[date]:len(casGroup)})
+    print('DATES',dates)
+    counter = 0
+    if len(dates) % 2 == 0:
+        for date in range(int(len(dates)/2)):
+            casGroup = Analyza1Model.objects.all().filter(casVytvoreniaTransakcie__range=[dates[counter], dates[counter+1]])
+            histCas.update({dates[counter]:len(casGroup)})
+            counter += 2
+    else:
+        for date in range(int(len(dates)/2)):
+            casGroup = Analyza1Model.objects.all().filter(casVytvoreniaTransakcie__range=[dates[counter], dates[counter+1]])
+            histCas.update({dates[counter]:len(casGroup)})
+            counter += 2
+        casGroup = Analyza1Model.objects.all().filter(casVytvoreniaTransakcie__gte=dates[len(dates)-1])
+        histCas.update({dates[len(dates)-1]:len(casGroup)})
     histogramy['histCas']=histCas
 
 
@@ -515,15 +515,19 @@ def data_processing(vstupy, id):
             
     ## aggregate query filter
     query = Q()
+    queryPsc = Q()
     if 'pscObvodu' in vstupy and 'all' not in vstupy['vekovaSkupina']:
         for k, v in dict(vstupy['pscObvodu']).items():
             sk = PscObvodu.objects.get(psc=v) 
-            query = query & Q(psc_id=sk.psc)     
+            queryPsc = queryPsc | Q(psc_id=sk.psc)
+    query = query & queryPsc
+    queryVekSk = Q()  
     if 'vekovaSkupina' in vstupy and 'all' not in vstupy['vekovaSkupina']:
         for k, v in dict(vstupy['vekovaSkupina']).items():
             sk = VekovaSkupina.objects.get(id=v)
             sk = sk.skupina.split('-')
-            query = query & Q(vek__gte=sk[0],vek__lte=sk[1])
+            queryVekSk = queryVekSk | Q(vek__gte=sk[0],vek__lte=sk[1])
+    query = query & queryVekSk
     if 'pohlavie' in vstupy and len(vstupy['pohlavie']) == 1 and 'all' not in vstupy['pohlavie']:
         query = query & Q(pohlavie=vstupy['pohlavie']['pohlavie'])
         
@@ -547,28 +551,54 @@ def data_processing(vstupy, id):
         ## od min - do max
         dateIntervals = [dt.date() for dt in rrule(interval, dtstart=minDate['casVytvoreniaTransakcie'], until=maxDate['casVytvoreniaTransakcie'])]      
 
-    
+    print('QUERY',query)
     graf = {}
     queryTime = Q()
-    for dateInterval in range(len(dateIntervals)):
-        if dateInterval + 1 >= len(dateIntervals):
-            queryTime = Q(casVytvoreniaTransakcie__gte=dateIntervals[dateInterval])
-        else:
-            queryTime = Q(casVytvoreniaTransakcie__range=[dateIntervals[dateInterval], dateIntervals[dateInterval+1]])
-        # GET 
+    counter = 0
+    if len(dateIntervals) % 2 == 0:
+        for dateInterval in range(int(len(dateIntervals)/2)):
+            queryTime = Q(casVytvoreniaTransakcie__range=[dateIntervals[counter], dateIntervals[counter+1]])
+            # GET 
+            group = Analyza1Model.objects.all().filter(query).filter(queryTime).distinct('pouzivatelId')
+            graf.update({dateIntervals[counter]:len(group)})
+            counter += 2
+    else:
+        for dateInterval in range(int(len(dateIntervals)/2)):
+            queryTime = Q(casVytvoreniaTransakcie__range=[dateIntervals[counter], dateIntervals[counter+1]])
+            # GET 
+            group = Analyza1Model.objects.all().filter(query).filter(queryTime).distinct('pouzivatelId')
+            graf.update({dateIntervals[counter]:len(group)})
+            counter += 2
+        queryTime = Q(casVytvoreniaTransakcie__gte=dateIntervals[len(dateIntervals)-1])
         group = Analyza1Model.objects.all().filter(query).filter(queryTime).distinct('pouzivatelId')
-        graf.update({dateIntervals[dateInterval]:len(group)})
-        vystupy.update({'output': group})
+        graf.update({dateIntervals[len(dateIntervals)-1]:len(group)})
+    
+    ## Tabulka output
+    group = Analyza1Model.objects.all().filter(query).distinct('pouzivatelId')
+    vystupy.update({'output': group})        
 
-    
+    #graf = {}
+    #queryTime = Q()
+    #for dateInterval in range(len(dateIntervals)):
+    #    if dateInterval + 1 >= len(dateIntervals):
+    #        queryTime = Q(casVytvoreniaTransakcie__gte=dateIntervals[dateInterval])
+    #    else:
+    #        queryTime = Q(casVytvoreniaTransakcie__range=[dateIntervals[dateInterval], dateIntervals[dateInterval+1]])
+    #    # GET 
+    #    group = Analyza1Model.objects.all().filter(query).filter(queryTime).distinct('pouzivatelId')
+    #    graf.update({dateIntervals[dateInterval]:len(group)})
+    #vystupy.update({'output': group})
+
     grafy['graf']=graf
-    
+    print('VSTUPY:--',vstupy)
+    print('HISTOGRAMY:--',histogramy)
+    print('GRAFY:--',grafy)
     ## All together
     vystupy.update({'histogramy':histogramy})
     vystupy.update({'grafy':grafy})
     return vystupy
 
-def analysis(vystupy):
+def analyzaDat(vystupy):
     urlFront = '/static/graphs/'
     path = 'bpapp/static/graphs/'
     graphsDict = {}
