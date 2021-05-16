@@ -1,8 +1,10 @@
 {% load static %}
 <!DOCTYPE html>
     <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="viewport" content="height=device-height, initial-scale=1.0">
         <link rel="stylesheet" type="text/css" href="{% static 'css/style.css' %}">
-	      <link rel="stylesheet" type="text/css" href="{% static 'css/bootstrap.css' %}">
+	    <link rel="stylesheet" type="text/css" href="{% static 'css/bootstrap.css' %}">
         {% block styles %}{% endblock %}
         <title>Bakalársky projekt</title>
     </head>   
@@ -20,10 +22,8 @@
                             <div class="dropdown-menu dropdown-menu-right bgdarkgray" aria-labelledby="navbarDropdownMenuLink">
                                 {% if login %}
                                     <a class="dropdown-item" href="{% url 'logout' %}">Logout ({{ login }})</a>
-                                {% else %}
-                                    <a class="dropdown-item" href="{% url 'login' %}">Login</a>
-                                {% endif %}
-                                <div class="dropdown-divider"></div> 
+                                <div class="dropdown-divider"></div>
+                                {% endif %} 
                                 <a class="dropdown-item" href="#">About</a>
                             </div>
                         </li>
@@ -31,37 +31,125 @@
                 </div>
             </div>
         </nav>
-      </header>
-      <main role="main">
+    </header>
+    <main role="main">
         {% if messages %}
         <ul class="messages">
           {% for message in messages %}
-            <div class="alert alert-success alert-dismissable" role="alert" style="text-align: center">
+            <div class="alert alert-error alert-dismissable" role="alert" style="text-align: center">
               <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
               {{ message }}
             </div>
           {% endfor %}
         </ul>
         {% endif %}
-        <div class="row">
-          <div class="col-md-12">
-            {% block body %}{% endblock %}
-          </div>
+        <div class="row globalRowWidth">
+            {% if login %}
+            <div class="col-md-4">
+                <div class="row">  
+                    <div class="col-md-12">
+                        <div class="row container alignCenter">
+                            <div class="col-md-8">
+                                <form role="form" action="{% url 'analyza' %}#table1" method="POST" enctype="multipart/form-data">
+                                    {% csrf_token %}
+                                    <div class="form-group">
+                                        <label for="inputFile">Nahraj súbor transakcií</label>
+                                        <input placeholder="transakcie.csv" type="file" class="form-control-file" name="fileCSV" id="inputFileTran" required>
+                                        <p class="help-block">Podporovaný typ: .csv</p>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="inputFile">Nahraj katalógový súbor</label>
+                                        <input placeholder="katalog.xml" type="file" class="form-control-file" name="fileXML" id="inputFileXml">
+                                        <p class="help-block">Podporovaný typ: .xml</p>
+                                    </div>
+                                    <!--<div class="form-group">
+                                        <label for="opacLink">OPAC url link (nepodporovaný)</label>
+                                        <input type="url" class="form-control" id="opacLink" readonly>
+                                    </div>--> 
+                                    <div class="form-group">
+                                        <label>Vyber analýzu</label>
+                                        <div>
+                                            <label>
+                                                <input type="checkbox" class="radio" value="1" name="analyza1" required/>Analýza 1</label>
+                                            <label>
+                                                <input type="checkbox" class="radio" value="1" name="analyza2" onclick="return false;"/>Analýza 2</label>
+                                            <label>
+                                                <input type="checkbox" class="radio" value="1" name="analyza3" onclick="return false;"/>Analýza 3</label>
+                                        </div>
+                                    </div>
+                                    <div style="float: right; padding: 15px">
+                                        <button type="submit" class="btn btn-primary">Potvrď</button>
+                                    </div> 
+                                </form>
+                                <hr>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12" style="height: 100%;">
+                        <h3 style="text-align: left;">Logy</h3>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="logs">
+                            <ol id="log" class="list-unstyled removeBottomMargin">
+                                <li class="list-item"></li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>   
+            </div>
+            {% endif %}
+            {% if login %}
+                <div class="col-md-8">
+                    {% block main %}{% endblock %}
+                </div>
+            {% else %}
+            <div class="col-md-12">
+                <div class="loginPadding">
+                    <form action="{% url 'index' %}" role="form" method="post" class="from-group">
+                        {% csrf_token %}
+                        <div class="form-group">
+                        <label for="exampleInputLogin1">Login</label>
+                        <input type="login" name="login" placeholder="admin" class="form-control" id="exampleInputLogin1" required>
+                        </div>
+                        <div class="form-group">
+                        <label for="exampleInputPassword1">Password</label>
+                        <input type="password" name="password" placeholder="******" class="form-control" id="exampleInputPassword1" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Submit</button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
         </div>
-      </main>
-      <!--<div class="sticky">
-        <ol class="list-unstyled removeBottomMargin">
-          <li class="list-item">
-            Lorem ipsum dolor sit amet
-          </li>
-        </ol>
-      </div>-->
-      <div class="footer">
-          <p class="mr-4 removeBottomMargin">© Matej Glemba</p>
-      </div>
-      {% block scripts %}{% endblock %}
-      <script src="{% static 'js/jquery.min.js' %}"></script>
-      <script src="{% static 'js/bootstrap.min.js' %}"></script>
-      <script src="{% static 'js/scripts.js' %}"></script>
+    </main>
+    <div class="footer">
+        <p class="mr-4 removeBottomMargin">© Matej Glemba</p>
+    </div>
+    {% block scripts %}{% endblock %}
+    <script src="{% static 'js/jquery.min.js' %}"></script>
+    <script src="{% static 'js/bootstrap.min.js' %}"></script>
+    <script src="{% static 'js/scripts.js' %}"></script>
+    <script>
+        $(document).ready(function() {
+            setInterval(function(){
+            $.ajax({
+                type: 'GET',
+                url: "{% url 'getLogs' %}",
+                success: function(response){
+                    console.log(response)
+                    if (response.log) {
+                        var log = "<li class\"list-item\">"+response.log+"</li>"
+                        $("#log").append(log);
+                    }
+                },
+                error: function(response){}
+            })
+            }, 1000);
+        });
+    </script>
   </body>
 </html>

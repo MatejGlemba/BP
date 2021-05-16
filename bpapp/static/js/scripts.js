@@ -27,4 +27,4 @@ $("input:checkbox").on('click', function() {
     } else {
       $box.prop("checked", false);
     }
-  });
+});

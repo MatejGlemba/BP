@@ -1,7 +1,7 @@
 # Create your views here.
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
-from .models import User, Katalog, PscObvodu, VekovaSkupina, Konspekt, TypOperacie, Analyza1Model, Analyza2Model, Analyza3Model
+from .models import User, PscObvodu, VekovaSkupina, Konspekt, TypOperacie, Analyza1Model, Analyza2Model, Analyza3Model
 from django.contrib import messages
 from django.urls import reverse
 from django.contrib.sessions.models import Session 
@@ -12,22 +12,34 @@ import xml.etree.ElementTree as ET
 from pymarc import MARCReader, parse_xml_to_array, Record
 import xmltodict, numpy as np, pandas as pd, matplotlib.pyplot as plt
 import matplotlib.pylab as plb
-#import matplotlib.dates as mdates
 import matplotlib
 from matplotlib.dates import date2num
 from pylab import rcParams
 from scipy import stats
 from django.db.models import Q, Count
 from operator import or_
-from functools import reduce
 from dateutil.rrule import rrule, MONTHLY, YEARLY, WEEKLY, DAILY
+from django.http.response import JsonResponse
+from django.core.exceptions import ObjectDoesNotExist
 
 
 user = {}
 importData = None
 vystupyData = None
-xmlCat = None
+graphs = None
+xmlCat = {}
 csvFile = None
+log = []
+
+def getLogs(request):
+    if log:
+        return JsonResponse({'log' : log.pop()})
+    else:
+        return JsonResponse({})
+
+def makeLog(message):
+    now = dt.datetime.now().strftime("%Y-%m-%d, %H:%M:%S")
+    return log.append(now + " : " + message) 
 
 def index(request):
     if request.method == 'POST' and not user and request.POST["login"] == "admin":
@@ -35,8 +47,8 @@ def index(request):
         context = {
             'login' : user["login"]
         }
+        
         #Clear models
-        Katalog.objects.all().delete()
         PscObvodu.objects.all().delete()
         Konspekt.objects.all().delete()
         TypOperacie.objects.all().delete()
@@ -45,7 +57,7 @@ def index(request):
         Analyza2Model.objects.all().delete()
         Analyza3Model.objects.all().delete()
 
-        messages.success(request, "User Logged in Successfully")
+        makeLog("User Logged in Successfully")
         return render(request, 'main.html', context=context)
     elif user:
         context = {
@@ -61,82 +73,109 @@ def login(request):
 def logout(request):
     if user:
         user.clear()
+        makeLog("User Logged out Successfully")
         return redirect('/')
     else:
         return render(request, 'index.html')
 
-def analyza(request, id):
-    if user:
-        if id == 1:
-            inicializaciaCiselnikov()
-            context = {
-                'login' : user["login"],
-                'analyzaId' : id,
-                'psc' : PscObvodu.objects.all(),
-                'vek' : VekovaSkupina.objects.all(),
-            }
-            return render(request, 'analyza1.html', context=context)
-        elif id == 2:
-            inicializaciaCiselnikov()
-            context = {
-                'login' : user["login"],
-                'analyzaId' : id,
-                'konspekt' : Konspekt.objects.all(),
-                'operacia' : TypOperacie.objects.all(),
-            }
-            return render(request, 'analyza2.html', context=context)
-        elif id == 3:
-            inicializaciaCiselnikov()
-            context = {
-                'login' : user["login"],
-                'analyzaId' : id,
-                'konspekt' : Konspekt.objects.all(),
-                'vek' : VekovaSkupina.objects.all(),
-            }
-            return render(request, 'analyza3.html', context=context)
-        else:
-            context = {
-                'login' : user["login"],
-                'analyzaId' : id,
-            }
-            return render(request, 'main.html', context=context)   
-
-def analyzaVystup(request, id, id2):
+def analyza(request):
     global importData
-    global vystupyData
     if user:
-        if id == 1: 
-            if id2 == 'import' and request.method == 'POST':
-                fileCSV = request.FILES['fileCSV']
-                #fileXML = request.FILES['fileXML']
-                if fileCSV.name.endswith('.csv'):# and fileXML.name.endswith('.xml'):
-                   # xmlFile(fileXML, id, request)
-                    csvFile(fileCSV, id, request)
+        if request.method == 'POST' and 'analyza1' in dict(request.POST.items()):
+            inicializaciaCiselnikov()
+            makeLog("Číselníky boli načítané")
+            if 'fileXML' in dict(request.FILES.items()):
+                fileXML = request.FILES['fileXML']
+                if fileXML.name.endswith('.xml'):
+                    if not xmlCat or not fileXML.name in xmlCat.keys():
+                        xmlFile(fileXML, 1, request)
                 else:
-                    messages.error(request, 'THIS IS NOT A CSV or XML FILE')
-                importData = Analyza1Model.objects.all()
-            elif id2 == 'uprava' and request.method == 'POST':
-                vstupy = spracujVstupy(request, id)
-                vystupyData = data_processing(vstupy, id)
-                analysis(vystupyData)
-            elif id2 == 'analyza':
-                analysis(vystupyData)
+                    messages.error(request, 'THIS IS NOT A XML FILE')
+            fileCSV = request.FILES['fileCSV']
+            if fileCSV.name.endswith('.csv'):
+                try:
+                    get = Analyza1Model.objects.count() > 0
+                    Analyza1Model.objects.all().delete()
+                except ObjectDoesNotExist: 
+                    get = None     
+                csvFile(fileCSV, 1, request)
+            else:
+                messages.error(request, 'THIS IS NOT A CSV FILE')
+            importData = Analyza1Model.objects.all()
             paginator = Paginator(importData, 5)
             page = request.GET.get('page', 1)
             data = paginator.page(page)
             context = {
                 'login' : user["login"],
-                'typ' : id2,
-                'analyzaId' : id,
+                'imported' : True,
+                'data' : data,
+                'analyzaId' : 1,
+                'psc' : PscObvodu.objects.all(),
+                'vek' : VekovaSkupina.objects.all(),
+            }  
+            return render(request, 'main.html', context=context)
+        elif request.method == 'POST' and 'analyza2' in dict(request.POST.items()):
+            inicializaciaCiselnikov()
+            context = {
+                'login' : user["login"],
+                'analyzaId' : 2,
+                'konspekt' : Konspekt.objects.all(),
+                'operacia' : TypOperacie.objects.all(),
+            }
+            return render(request, 'main.html', context=context)
+        elif request.method == 'POST' and 'analyza3' in dict(request.POST.items()):
+            inicializaciaCiselnikov()
+            context = {
+                'login' : user["login"],
+                'analyzaId' : 3,
+                'konspekt' : Konspekt.objects.all(),
+                'vek' : VekovaSkupina.objects.all(),
+            }
+            return render(request, 'main.html', context=context)
+        else:
+            importData = Analyza1Model.objects.all()
+            paginator = Paginator(importData, 5)
+            page = request.GET.get('page', 1)
+            data = paginator.page(page)
+            context = {
+                'login' : user["login"],
+                'imported' : True,
                 'data' : data,
                 'psc' : PscObvodu.objects.all(),
                 'vek' : VekovaSkupina.objects.all(),
+            }
+            return render(request, 'main.html', context=context)   
+
+def analyzaVystup(request, id):
+    global vystupyData
+    global graphs
+    
+    if user:
+        if id == 1: 
+            if request.method == 'POST':
+                vstupy = spracujVstupy(request, id)
+                makeLog("Vstupy do analýzy boli spracované")
+                vystupy = data_processing(vstupy, id)
+                vystupyData = vystupy['output'] 
+                makeLog("Dáta na základe vstupov boli agregované")
+                graphs = analysis(vystupy)
+                makeLog("Výstupné sústavy z analýzy boli vytvorené")
+            paginator = Paginator(vystupyData, 5)
+            page = request.GET.get('page', 1)
+            data = paginator.page(page)
+            context = {
+                'login' : user["login"],
+                'imported': True,
+                'data' : data,
+                'graphs' : graphs,
+                'psc' : PscObvodu.objects.all(),
+                'vek' : VekovaSkupina.objects.all(),
             }   
-            return render(request, 'analyza1.html', context=context)
+            return render(request, 'main.html', context=context)
         elif id == 2 and request.method == 'POST':
-            return render(request, 'analyza2.html', context=context)
+            return render(request, 'main.html', context=context)
         elif id == 3 and request.method == 'POST':
-            return render(request, 'analyza3.html', context=context)
+            return render(request, 'main.html', context=context)
         else:
             return render(request, 'main.html', context=context)
 
@@ -198,8 +237,10 @@ def inicializaciaCiselnikov():
     v.save()
 
 def xmlFile(file, id, request):
+    makeLog("Načítava sa XML súbor")
     records = parse_xml_to_array(file)
-    xmlCat = records
+    xmlCat.update({file.name: records})
+    makeLog("XML súbor je načítaný")
     #for record in records:
     #    obj = Katalog()
     #    setattr(obj, 'record', record.as_json())
@@ -209,6 +250,7 @@ def xmlFile(file, id, request):
         #print(k, v)
 
 def csvFile(file, id, request):
+    makeLog("Načítava sa CSV súbor")
     data = file.read().decode('UTF-8')
     io_string = io.StringIO(data)
     next(io_string) 
@@ -225,13 +267,16 @@ def csvFile(file, id, request):
             rowCounter += 1
         #else:
         #    messages.error(request, 'File has more than 26 columns !')
+    makeLog("Dáta z CSV súboru boli úspešne validované")
     putIntoDB(rows, id)
 
 def inicializeAnalyze1Tab(column, request):
     row = {}
+
     ## tcraete
-    columnCounter = 1
+    columnCounter = 1 
     tcreate = column[columnCounter]
+    print('TCREATE',tcreate)
     if len(tcreate) == 18 and tcreate[15] == '.' and tcreate[1:9].isdigit():
         tcreate = tcreate[1:5] + '-' + tcreate[5:7] + '-' + tcreate[7:9]
         row.update({'casVytvoreniaTransakcie': tcreate})
@@ -239,46 +284,32 @@ def inicializeAnalyze1Tab(column, request):
         messages.error(request, 'Wrong form of tcreate field')
     
     columnCounter += 10
-    if hasDigitAndDot(column[columnCounter]): ## check for price, sometimes it has comma inside instead of dot
+    if hasDigit(column[columnCounter]) and hasDigit(column[columnCounter + 1]) and len(column[columnCounter+1]) == 3: ## "285 Kč" 
         columnCounter += 1
     columnCounter += 4
 
     ## pohlavie
     anonym = column[columnCounter]
+    print('ANONYM',anonym)
     columnCounter += 1
     if len(anonym) == 3 and anonym[1].isdigit() and int(anonym[1]) in [0, 1]:
         anonym = int(anonym[1])
         pohlavie = column[columnCounter]
+        print('POHHLAVIE',pohlavie)
         if anonym == 0:
             if pohlavie.isalpha() and len(pohlavie) > 2 and len(pohlavie) < 7 and pohlavie in ["zena", "muz"]:
                 row.update({'pohlavie': pohlavie})
             else:
-                r = random.randint(0,1)
-                if r == 0:
-                    pohlavie = "zena"
-                else:
-                    pohlavie = "muz"
-                row.update({'pohlavie': pohlavie})
+                row.update({'pohlavie': ''})
         elif anonym == 1:
-            r = random.randint(0,1)
-            if r == 0:
-                pohlavie = "zena"
-            else:
-                pohlavie = "muz"
-            row.update({'pohlavie': pohlavie})
+            row.update({'pohlavie': ''})
     else:
-        anonym = 1
-        r = random.randint(0,1)
-        if r == 0:
-            pohlavie = "zena"
-        else:
-            pohlavie = "muz"
-        row.update({'pohlavie': pohlavie})
-        #messages.error(request, 'Wrong form of pohlavie field')
+        row.update({'pohlavie': ''})
 
     ## userHash
     columnCounter += 1
     userHash = column[columnCounter]
+    print('HASH',userHash)
     if userHash:
         row.update({'pouzivatelId': userHash})
     else:
@@ -287,6 +318,7 @@ def inicializeAnalyze1Tab(column, request):
     ## psc
     columnCounter += 2
     pscOld = column[columnCounter]
+    print('PSC',pscOld)
     if len(pscOld) == 8 and pscOld[4] == " ":
         psc = pscOld[1:7]
         psc = psc.replace(' ', '')
@@ -308,14 +340,15 @@ def inicializeAnalyze1Tab(column, request):
     ## vek
     columnCounter += 1
     if anonym == 0: 
+        print('PSC',column[columnCounter])
         vek = column[columnCounter].replace('"', '')
-        if vek.isdigit() and int(vek) > 5:   
+        if vek.isdigit() and int(vek) >= 0:   
             row.update({'vek': int(vek)})
         else:
-            row.update({'vek': random.randint(15, 80)})
+            row.update({'vek': 0})
             #messages.error(request, 'Wrong form of vek field')
     elif anonym == 1:
-        row.update({'vek': random.randint(15, 80)})
+        row.update({'vek': 0})
     
     return row
 
@@ -325,8 +358,8 @@ def inicializeAnalyze2Tab(column):
 def inicializeAnalyze3Tab(column):
     return
 
-def hasDigitAndDot(inputString):
-    return any(char.isdigit() for char in inputString) and "." not in inputString
+def hasDigit(inputString):
+    return any(char.isdigit() for char in inputString)
 
 def putIntoDB(rows, id):
     for key, value in rows.items():
@@ -339,11 +372,38 @@ def putIntoDB(rows, id):
             obj = Analyza2Model()
         elif id == 3: ## Store model for analyza1
             obj = Analyza3Model()
-        
+    makeLog("Dáta boli úspešne uložené v databáze")
+    putVekAndPohlavieInMissingFields()
+
+def putVekAndPohlavieInMissingFields():
+    ## Put vek
+    makeLog("Pridáva sa vek na voľné miesta podľa užívateľov")
+    allTransactions = Analyza1Model.objects.all().values('pouzivatelId').distinct('pouzivatelId')
+    print(len(allTransactions))
+    for transaction in allTransactions:
+        print(transaction)
+        objects = Analyza1Model.objects.filter(pouzivatelId=transaction['pouzivatelId'], vek=0)
+        vek = random.randint(15,80)
+        for obj in objects:
+            setattr(obj, 'vek', vek)
+            obj.save()   
+
+    ## Put pohlavie
+    makeLog("Pridáva sa pohlavie na voľné miesta podľa užívateľov")
+    for transaction in allTransactions:
+        objects = Analyza1Model.objects.filter(pouzivatelId=transaction['pouzivatelId'], pohlavie='')
+        r = random.randint(0,1)
+        for obj in objects:
+            if r == 0:
+                setattr(obj, 'pohlavie', "zena")
+            else:
+                setattr(obj, 'pohlavie', "muz")
+            obj.save()  
+
 def spracujVstupy(request, id):
     vstupy = {}
     postItems = dict(request.POST.items())
-   
+    
     ## Pohlavie
     pohlavie = {}
     if 'pohlavieM' in postItems:
@@ -409,8 +469,6 @@ def data_processing(vstupy, id):
     else:
         interval = DAILY
 
-    print('Interval',interval)
-
     ## min and max time 
     maxDate = Analyza1Model.objects.all().values('casVytvoreniaTransakcie').order_by('-casVytvoreniaTransakcie')[0]
     minDate = Analyza1Model.objects.all().values('casVytvoreniaTransakcie').order_by('casVytvoreniaTransakcie')[0]  
@@ -418,9 +476,8 @@ def data_processing(vstupy, id):
 
     ## Histogramy
     histogramy = {}
-
     ## hist pohlavie
-    histPohlavieQ = Analyza1Model.objects.values('pohlavie').annotate(dcount=Count('*')).order_by()
+    histPohlavieQ = Analyza1Model.objects.all().values('pohlavie').annotate(dcount=Count('pouzivatelId', distinct = True)).order_by()
     histPohlavie = {}
     for h in histPohlavieQ:
         histPohlavie.update({h['pohlavie'] : h['dcount']})
@@ -435,7 +492,7 @@ def data_processing(vstupy, id):
     histogramy['histVek']=histVek
 
     ## hist psc 
-    histPscQ = Analyza1Model.objects.values('psc_id').annotate(dcount=Count('*')).order_by()
+    histPscQ = Analyza1Model.objects.values('psc_id').annotate(dcount=Count('pouzivatelId', distinct = True)).order_by()
     histPsc = {}
     for h in histPscQ:
         obv = PscObvodu.objects.get(psc=h['psc_id'])
@@ -461,16 +518,15 @@ def data_processing(vstupy, id):
     if 'pscObvodu' in vstupy and 'all' not in vstupy['vekovaSkupina']:
         for k, v in dict(vstupy['pscObvodu']).items():
             sk = PscObvodu.objects.get(psc=v) 
-            query = query | Q(psc_id=sk.psc)     
+            query = query & Q(psc_id=sk.psc)     
     if 'vekovaSkupina' in vstupy and 'all' not in vstupy['vekovaSkupina']:
         for k, v in dict(vstupy['vekovaSkupina']).items():
             sk = VekovaSkupina.objects.get(id=v)
             sk = sk.skupina.split('-')
-            query = query | Q(vek__gte=sk[0],vek__lte=sk[1])
+            query = query & Q(vek__gte=sk[0],vek__lte=sk[1])
     if 'pohlavie' in vstupy and len(vstupy['pohlavie']) == 1 and 'all' not in vstupy['pohlavie']:
-        query = query | Q(pohlavie=vstupy['pohlavie']['pohlavie'])
+        query = query & Q(pohlavie=vstupy['pohlavie']['pohlavie'])
         
-
     dateIntervals = None
     if 'cas' in vstupy:
         if len(vstupy['cas']) == 1:
@@ -502,6 +558,8 @@ def data_processing(vstupy, id):
         # GET 
         group = Analyza1Model.objects.all().filter(query).filter(queryTime).distinct('pouzivatelId')
         graf.update({dateIntervals[dateInterval]:len(group)})
+        vystupy.update({'output': group})
+
     
     grafy['graf']=graf
     
@@ -511,155 +569,114 @@ def data_processing(vstupy, id):
     return vystupy
 
 def analysis(vystupy):
-    path = 'bpapp/graphs/analyza1/'
+    urlFront = '/static/graphs/'
+    path = 'bpapp/static/graphs/'
+    graphsDict = {}
 
     ## Hlavne Grafy
     for k,graf in vystupy['grafy'].items():
+        ## - vstupne polia pre hlavne grafy
         y = list(graf.values())
         x = []
         for key in list(graf.keys()):
             x.append(key.strftime("%m/%d/%Y"))
         x = matplotlib.dates.datestr2num(x)
         
-        
-
-        ## -------------------------------
+        ## -------------Main Hist----------------
         plt.bar(graf.keys(), graf.values(), color='g')
-        #plt.show()
+        plt.suptitle('Histogram', fontsize=20)
+        plt.xlabel('Dátum', fontsize=18)
+        plt.ylabel('Počet transakcií', fontsize=16)
         plt.gcf().autofmt_xdate()
-        plt.savefig(path + 'mainHist.png')
+        nazov = path + 'mainHist.png'
+        plt.savefig(nazov)
+        url = urlFront + 'mainHist.png'
+        pair = {}
+        pair.update({'url': url })
+        pair.update({'popis': "Histogram počtu transakcií všetkých užívateľov podľa vstupných parametrov [pohlavie, obvod, veková skupina] vzhľadom na čas ich vytvorenia, ktorý je rozdelený do rozsahu podľa vstupného parametra (defaulnte je to od najstaršej transakcie po najnovšiu) v intervaloch podľa vstupného parametra (defaultne to je Denne)."})
+        graphsDict.update({'pairMainHist': pair })
         plt.close()
-        ## ------------------------------------------------------------
-        ## Polynomial MOJ
-        maxValue = max(y)
+        
+        ## ---------------Main Polynomial--------
         lenX = len(x)
-        mymodel = np.poly1d(np.polyfit(x, y, 3))
-        myline = np.linspace(x[0], x[lenX-1], 10)
+        model = np.poly1d(np.polyfit(x, y, 3))
+        line = np.linspace(x[0], x[lenX-1], 10)
         fig, ax = plt.subplots() 
         plt.scatter(x, y)
-        plt.plot(myline, mymodel(myline))
+        plt.plot(line, model(line))
         l = matplotlib.dates.AutoDateLocator()
         f = matplotlib.dates.AutoDateFormatter(l)
         ax.xaxis.set_major_locator(l)
         ax.xaxis.set_major_formatter(f)
-        #plt.show()
+        plt.suptitle('Polynomialna regresia', fontsize=20)
+        plt.xlabel('Dátum', fontsize=18)
+        plt.ylabel('Počet transakcií', fontsize=16)
         plt.gcf().autofmt_xdate()
-        plt.savefig(path + 'polyMain.png')
+        nazov = path + 'polyMain.png'
+        plt.savefig(nazov)
+        url = urlFront + 'polyMain.png'
+        pair = {}
+        pair.update({'url': url })
+        pair.update({'popis': "Graf polynomialnej funkcie, ktorá zodpovedá vstupným parametrom. Ak neboli zadané žiadne, je aplikovaná na všetky dáta. Polynomiálna regresia je vhodnejšia na presnejšiu aproximáciu vstupných nezávislých dát (os x), čím sa snaží čo najlepšie predikovať závislé dáta. Ak sú ale veľké výkyvy hodnôt, môže byť nepresná. V tomto grafe je polynomialna funkcia 3 stupňa." })
+        graphsDict.update({'pairPolyMain': pair })
         plt.close()
-        #--------------------------------------------------
-        ## POlynomial PRIKLAD
-        a = [97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108]
-        #a = [1,2,3,5,6,7,8,9,10,12,13,14,15,16,18,19,21,22]
-        b = [100,90,80,60,60,55,60,65,70,70,75,76]
-        bMax = max(b)
-        mymodel = np.poly1d(np.polyfit(a, b, 3))
 
-        myline = np.linspace(97, 108, bMax)
-
-        plt.scatter(a, b)
-        plt.plot(myline, mymodel(myline))
-        #plt.show()
-        plt.gcf().autofmt_xdate()
-        plt.savefig(path + 'polyEx1.png')
-        plt.close()
-        ## -------------------------------------------------------
-        ## Polynomial Date Priklad
-
-        idx_1 = dt.datetime(2017,6,7,0,0,0)
-        idx_2 = dt.datetime(2017,7,27,0,0,0)
-        idx_3 = dt.datetime(2017,7,28,0,0,0)
-        idx_4 = dt.datetime(2017,7,30,0,0,0)
-        idx_5 = dt.datetime(2017,8,3,0,0,0)
-        idx_6 = dt.datetime(2017,8,7,0,0,0)
-
-        idx = [idx_1, idx_2, idx_3, idx_4, idx_5, idx_6]
-
-        y1 = 155.98
-        y2 = 147.07
-        y3 = 140.07
-        y4 = 167.07
-        y5 = 197.07
-        y6 = 137.07
-
-        a = []
-        b = []
-        a = matplotlib.dates.date2num(idx)
-        b = [y1, y2, y3, y4, y5, y6]
-        #Difference = x[1] - x[0] #this helps to end the plotted line at specific point
-        coefficients = np.polyfit(a, b, 3) ## Degree of the fitting polynomial
-        polynomial = np.poly1d(coefficients)
-        # the np.linspace lets you set number of data points, line length.
-        #x_axis = np.linspace(x[0], x[1] + Difference, 3)  # linspace(start, end, num)
-        x_axis = np.linspace(a[0], a[5], 10) ## 10- rozptyl na y-osi
-        y_axis = polynomial(x_axis)
-        plt.plot(x_axis, y_axis)
-        plt.scatter(a, b)
-        #plt.plot(a[0], b[0], 'go')
-        #plt.plot(a[1], b[1], 'go')
-
-        loc= matplotlib.dates.AutoDateLocator()
-        plt.gca().xaxis.set_major_locator(loc)
-        plt.gca().xaxis.set_major_formatter(matplotlib.dates.AutoDateFormatter(loc))
-        plt.gcf().autofmt_xdate()
-        #plt.show()
-        plt.gcf().autofmt_xdate()
-        plt.savefig(path + 'polyEx2.png')
-        plt.close()
-        ## -------------------------------------------------------------------------
-        ## linear MOJ
+        ## ---------------Main Linear-------------
         slope, intercept, r, p, std_err = stats.linregress(x, y)
-        def myfunc(x):
+        def func(x):
             return slope * x + intercept
-        mymodel = list(map(myfunc, x))
+        model = list(map(func, x))
         fig, ax = plt.subplots()
         ax.scatter(x, y)
-        ax.plot(x, mymodel)
-        # instruct matplotlib on how to convert the numbers back into dates for the x-axis
+        ax.plot(x, model)
         l = matplotlib.dates.AutoDateLocator()
         f = matplotlib.dates.AutoDateFormatter(l)
         ax.xaxis.set_major_locator(l)
         ax.xaxis.set_major_formatter(f)
-        #plt.show()
+        plt.suptitle('Lineárna regresia', fontsize=20)
+        plt.xlabel('Dátum', fontsize=18)
+        plt.ylabel('Počet transakcií', fontsize=16)
         plt.gcf().autofmt_xdate()
-        plt.savefig(path + 'linMain.png')
+        nazov = path + 'linMain.png'
+        plt.savefig(nazov)
+        url = urlFront + 'linMain.png'
+        pair = {}
+        pair.update({'url': url })
+        pair.update({'popis': "Graf lineárnej regresie. Lineárna regresia je základným typom analýzy na princípe \"Supervised learning\". Na rozdieľ od polynomiálnej funkcie, lineárna popisuje lineárny vzťah medzi závislou a nezávislou hodnotou."})
+        graphsDict.update({'pairLinMain': pair })
         plt.close()
-        ## --------------------------------------------------------------------------------
-        ## LINEAR PRIKLAD
-        x = ['01/01/2019', '01/02/2019', '01/03/2019', '01/04/2019', '01/05/2019', '01/06/2019', '01/07/2019', '01/08/2019', '01/09/2019', '01/10/2019', '01/11/2019', '01/12/2019']
-        y = [12050, 17044, 14066, 16900, 19979, 17593, 14058, 16003, 15095, 12785, 12886, 20008]
-        # convert the dates to a number, using the datetime module
-        #x = [dt.datetime.strptime(i, '%M/%d/%Y').toordinal() for i in x]
-       # print('x---',x)
-        x = matplotlib.dates.datestr2num(x)
-        #print('X-NOVE-',x)
-        slope, intercept, r, p, std_err = stats.linregress(x, y)
-        def myfunc(x):
-            return slope * x + intercept
-        mymodel = list(map(myfunc, x))
-        fig, ax = plt.subplots()
-        ax.scatter(x, y)
-        ax.plot(x, mymodel)
-        # instruct matplotlib on how to convert the numbers back into dates for the x-axis
-        l = matplotlib.dates.AutoDateLocator()
-        f = matplotlib.dates.AutoDateFormatter(l)
-        ax.xaxis.set_major_locator(l)
-        ax.xaxis.set_major_formatter(f)
-        plt.gcf().autofmt_xdate()
-        plt.suptitle('Linearna regresia', fontsize=20)
-        plt.xlabel('Datum', fontsize=18)
-        plt.ylabel('Pocet', fontsize=16)
-        plt.savefig(path + 'linEx.png')
-        plt.close()
-    
+        
+        
+       
     # POMOCNE HISTOGRAMY
     inc = 1
     for k,v in vystupy['histogramy'].items():
         plt.bar(v.keys(), v.values(), color='g')
         nazov = path + 'histPart' + str(inc) + '.png'
+        plt.suptitle('Histogram', fontsize=20)
+        pair = {}
+        if k == 'histVek':
+            pair.update({'popis': "Histogram všetkých transakcií používateľov podľa vekových skupín."})
+            plt.xlabel('Veková skupina', fontsize=18)
+        elif k == 'histCas':
+            pair.update({'popis': "Histogram všetkých vykonaných transakcií podľa ich dátumu vytvorenia rozdelené do intervalou podľa vstupu alebo defaultne denne."})
+            plt.xlabel('Dátum', fontsize=18)
+        elif k == 'histPsc':
+            pair.update({'popis': "Histogram všetkých transakcií používateľov podľa ich bydliska."})
+            plt.xlabel('Obvod', fontsize=18)
+        elif k == 'histPohlavie':
+            pair.update({'popis': "Histogram všetkých transakcií používateľov podľa ich pohlavia."})
+            plt.xlabel('Pohlavie', fontsize=18)
+        plt.ylabel('Počet transakcií', fontsize=16)
         plt.gcf().autofmt_xdate()
         plt.savefig(nazov)
+        url = urlFront + 'histPart' + str(inc) + '.png'
+        pair.update({'url' : url })
+        graphsDict.update({'pair' + 'histPart' + str(inc): pair})
         plt.close()
         inc += 1
+
+    return graphsDict
 
 def displayMarcXml(file):
     records = parse_xml_to_array(file)

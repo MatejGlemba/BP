@@ -32,10 +32,6 @@ class User(models.Model):
 #    pocetProlongaci = models.CharField(null=True)
 #    pocetUpominek = models.CharField(null=True)
         
-class Katalog(models.Model):
-    id = models.IntegerField(primary_key=True)
-    katalog = models.TextField(null=True)
-
 # Číselníky
 class TypOperacie(models.Model):
     id = models.CharField(max_length=3, primary_key=True)
@@ -61,16 +57,7 @@ class Analyza1Model(models.Model):
     pohlavie = models.CharField(max_length=4)
     psc_id = models.ForeignKey(PscObvodu, on_delete=models.CASCADE)
     casVytvoreniaTransakcie = models.DateField()
-    
-    #def __init__(self, pouzivatelId: str or None, vek: int, pohlavie: str, casVytvoreniaTransakcie: str,
-    ##             psc_id: PscObvodu):
-     #   self.pouzivatelId = pouzivatelId
-     #   self.vek = vek
-     #   self.pohlavie = pohlavie
-     #   self.casVytvoreniaTransakcie = casVytvoreniaTransakcie
-     #   self.psc_id = psc_id
-       
-
+           
 class Analyza2Model(models.Model):
     id = models.AutoField(primary_key=True)
     transakciaId = models.IntegerField()

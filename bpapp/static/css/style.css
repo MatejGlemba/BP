@@ -20,9 +20,9 @@
 }
 
 .loginPadding {
-    padding: 10%;
+    padding: 7%;
     max-width: fit-content;
-    margin-left: 25%;
+    margin-left: 33%;
 }
 
 .nadpisAlign {
@@ -39,6 +39,8 @@
 }
 
 .alignCenter {
+    justify-content: center;
+    margin-top: 5%;
     margin-left: auto !important;
     margin-right: auto !important;
 }
@@ -52,11 +54,14 @@
     font-weight: 500;
 }
 
-.sticky {
+.logs {
     position: sticky !important;
+    height: 125px;
     bottom: 0;
     background-color: black;
     color: green;
+    max-height: 150px !important;
+    overflow-y: auto;
 }
 
 .buttonsCenter {
@@ -78,4 +83,8 @@
 
 .currectPageStyle {
     background-color: #a3a5a7 !important;
+}
+
+.globalRowWidth {
+    max-width: 100%;
 }
