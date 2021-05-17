@@ -1,36 +1,9 @@
 from django.db import models
-
 # Create your models here.
+
 class User(models.Model):
     name = models.TextField()
     password = models.TextField()
-
-#class Transakcia(models.Model):
-#    ArlID = models.CharField(null=True)
-#    tcreate = models.DateTimeField(null=True)
-#    idRow = models.CharField(null=True)
-#    op = models.CharField(null=True)
-#    tag = models.CharField(null=True)
-#    DatOP = models.CharField(null=True)
-#    Pobocka = models.CharField(null=True)
-#    holding = models.CharField(null=True)
-#    catId = models.CharField(null=True)
-#    Tcat_020a = models.CharField(null=True)
-#    Tcat_020q = models.CharField(null=True)
-#    Tcat_020c = models.CharField(null=True)
-#    Tcat_T015a = models.CharField(null=True)
-#    Tcat_T035a = models.CharField(null=True)
-#    Tcat_T080a = models.CharField(null=True)
-#    isanonym = models.CharField(null=True)
-#    pohlavi = models.CharField(null=True)
-#    userHash = models.CharField(null=True)
-#    userTyp = models.CharField(null=True)
-#    psc = models.CharField(null=True)
-#    vek = models.CharField(null=True)
-#    casVypujceni = models.CharField(null=True)
-#    DelkaTransakce = models.CharField(null=True)
-#    pocetProlongaci = models.CharField(null=True)
-#    pocetUpominek = models.CharField(null=True)
         
 # Číselníky
 class TypOperacie(models.Model):
@@ -57,7 +30,8 @@ class Analyza1Model(models.Model):
     pohlavie = models.CharField(max_length=4, null=True)
     psc_id = models.ForeignKey(PscObvodu, on_delete=models.CASCADE, null=True)
     casVytvoreniaTransakcie = models.DateField(null=True)
-           
+
+## Pripravene na rozsirenie           
 class Analyza2Model(models.Model):
     id = models.AutoField(primary_key=True)
     transakciaId = models.IntegerField()

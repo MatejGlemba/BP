@@ -56,11 +56,11 @@
 
 .logs {
     position: sticky !important;
-    height: 125px;
+    height: 200px;
     bottom: 0;
     background-color: black;
     color: green;
-    max-height: 150px !important;
+    max-height: 200px !important;
     overflow-y: auto;
 }
 

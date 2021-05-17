@@ -29,17 +29,17 @@ vystupyData = None
 graphs = None
 xmlCat = {}
 csvFile = None
-log = []
+logy = []
 
 def getLogs(request):
-    if log:
-        return JsonResponse({'log' : log.pop()})
+    if logy:
+        return JsonResponse({'log' : logy.pop()})
     else:
         return JsonResponse({})
 
-def makeLog(message):
+def log(message):
     now = dt.datetime.now().strftime("%Y-%m-%d, %H:%M:%S")
-    return log.append(now + " : " + message) 
+    return logy.append(now + " : " + message) 
 
 def index(request):
     if request.method == 'POST' and not user and request.POST["login"] == "admin":
@@ -54,10 +54,8 @@ def index(request):
         TypOperacie.objects.all().delete()
         VekovaSkupina.objects.all().delete()
         Analyza1Model.objects.all().delete()
-        Analyza2Model.objects.all().delete()
-        Analyza3Model.objects.all().delete()
 
-        makeLog("User Logged in Successfully")
+        log("User Logged in Successfully")
         return render(request, 'main.html', context=context)
     elif user:
         context = {
@@ -73,7 +71,7 @@ def login(request):
 def logout(request):
     if user:
         user.clear()
-        makeLog("User Logged out Successfully")
+        log("User Logged out Successfully")
         return redirect('/')
     else:
         return render(request, 'index.html')
@@ -83,12 +81,12 @@ def analyza(request):
     if user:
         if request.method == 'POST' and 'analyza1' in dict(request.POST.items()):
             inicializaciaCiselnikov()
-            makeLog("Číselníky boli načítané")
+            log("Číselníky boli načítané")
             if 'fileXML' in dict(request.FILES.items()):
                 fileXML = request.FILES['fileXML']
                 if fileXML.name.endswith('.xml'):
                     if not xmlCat or not fileXML.name in xmlCat.keys():
-                        xmlFile(fileXML, 1, request)
+                        xmlSubor(fileXML, 1, request)
                 else:
                     messages.error(request, 'THIS IS NOT A XML FILE')
             fileCSV = request.FILES['fileCSV']
@@ -98,7 +96,7 @@ def analyza(request):
                     Analyza1Model.objects.all().delete()
                 except ObjectDoesNotExist: 
                     get = None     
-                csvFile(fileCSV, 1, request)
+                csvSubor(fileCSV, 1, request)
             else:
                 messages.error(request, 'THIS IS NOT A CSV FILE')
             importData = Analyza1Model.objects.all()
@@ -113,24 +111,6 @@ def analyza(request):
                 'psc' : PscObvodu.objects.all(),
                 'vek' : VekovaSkupina.objects.all(),
             }  
-            return render(request, 'main.html', context=context)
-        elif request.method == 'POST' and 'analyza2' in dict(request.POST.items()):
-            inicializaciaCiselnikov()
-            context = {
-                'login' : user["login"],
-                'analyzaId' : 2,
-                'konspekt' : Konspekt.objects.all(),
-                'operacia' : TypOperacie.objects.all(),
-            }
-            return render(request, 'main.html', context=context)
-        elif request.method == 'POST' and 'analyza3' in dict(request.POST.items()):
-            inicializaciaCiselnikov()
-            context = {
-                'login' : user["login"],
-                'analyzaId' : 3,
-                'konspekt' : Konspekt.objects.all(),
-                'vek' : VekovaSkupina.objects.all(),
-            }
             return render(request, 'main.html', context=context)
         else:
             importData = Analyza1Model.objects.all()
@@ -154,12 +134,12 @@ def analyzaVystup(request, id):
         if id == 1: 
             if request.method == 'POST':
                 vstupy = spracujVstupy(request, id)
-                makeLog("Vstupy do analýzy boli spracované")
+                log("Vstupy do analýzy boli spracované")
                 vystupy = spracovanieDat(vstupy, id)
                 vystupyData = vystupy['output'] 
-                makeLog("Dáta na základe vstupov boli agregované")
+                log("Dáta na základe vstupov boli agregované")
                 graphs = analyzaDat(vystupy)
-                makeLog("Výstupné sústavy z analýzy boli vytvorené")
+                log("Výstupné sústavy z analýzy boli vytvorené")
             paginator = Paginator(vystupyData, 5)
             page = request.GET.get('page', 1)
             data = paginator.page(page)
@@ -171,10 +151,6 @@ def analyzaVystup(request, id):
                 'psc' : PscObvodu.objects.all(),
                 'vek' : VekovaSkupina.objects.all(),
             }   
-            return render(request, 'main.html', context=context)
-        elif id == 2 and request.method == 'POST':
-            return render(request, 'main.html', context=context)
-        elif id == 3 and request.method == 'POST':
             return render(request, 'main.html', context=context)
         else:
             return render(request, 'main.html', context=context)
@@ -236,21 +212,14 @@ def inicializaciaCiselnikov():
     setattr(v, 'skupina', "71-100")
     v.save()
 
-def xmlFile(file, id, request):
-    makeLog("Načítava sa XML súbor")
+def xmlSubor(file, id, request):
+    log("Načítava sa XML súbor")
     records = parse_xml_to_array(file)
     xmlCat.update({file.name: records})
-    makeLog("XML súbor je načítaný")
-    #for record in records:
-    #    obj = Katalog()
-    #    setattr(obj, 'record', record.as_json())
-    #    obj.save()
-    #xml = xmltodict.parse(file)
-    #for k,v in xml.items():
-        #print(k, v)
+    log("XML súbor je načítaný")
 
-def csvFile(file, id, request):
-    makeLog("Načítava sa CSV súbor")
+def csvSubor(file, id, request):
+    log("Načítava sa CSV súbor")
     data = file.read().decode('UTF-8')
     io_string = io.StringIO(data)
     next(io_string) 
@@ -260,14 +229,8 @@ def csvFile(file, id, request):
         if len(row) <= 26:
             if id == 1:
                 rows[rowCounter] = validujDataAnal1(row, request)
-            elif id == 2:
-                rows[rowCounter] = validujDataAnal2(row)
-            elif id == 3:
-                rows[rowCounter] = validujDataAnal3(row)
             rowCounter += 1
-        #else:
-        #    messages.error(request, 'File has more than 26 columns !')
-    makeLog("Dáta z CSV súboru boli úspešne validované")
+    log("Dáta z CSV súboru boli úspešne validované")
     vlozDoDB(rows, id)
 
 def validujDataAnal1(row, request):
@@ -280,10 +243,10 @@ def validujDataAnal1(row, request):
         tcreate = tcreate[1:5] + '-' + tcreate[5:7] + '-' + tcreate[7:9]
         rowDict.update({'casVytvoreniaTransakcie': tcreate})
     else:
-        messages.error(request, 'Wrong form of tcreate field')
+        messages.info(request, 'Wrong form of tcreate field')
     
     columnCounter += 10
-    if hasDigit(row[columnCounter]) and hasDigit(row[columnCounter + 1]) and len(row[columnCounter+1]) == 3: ## "285 Kč" 
+    if obsahujeCislo(row[columnCounter]) and obsahujeCislo(row[columnCounter + 1]) and len(row[columnCounter+1]) == 3: ## "285 Kč" 
         columnCounter += 1
     columnCounter += 4
 
@@ -309,7 +272,7 @@ def validujDataAnal1(row, request):
     if userHash:
         rowDict.update({'pouzivatelId': userHash})
     else:
-        messages.error(request, 'Missing UserHash field')
+        messages.info(request, 'Missing UserHash field')
 
     ## psc
     columnCounter += 2
@@ -323,13 +286,10 @@ def validujDataAnal1(row, request):
                 obv = PscObvodu.objects.get(psc=psc)
             except:
                 obv = PscObvodu.objects.get(psc=99999)
-                #messages.error(request, 'Wrong form of psc field [Not digit]')
             rowDict.update({'psc_id': obv})
         else:
-            #messages.error(request, 'Wrong form of psc field [Not digit]')
             rowDict.update({'psc_id': PscObvodu.objects.get(psc=99999)})
     else:
-        #messages.error(request, 'Wrong form of psc field')
         rowDict.update({'psc_id': PscObvodu.objects.get(psc=99999)})
     
     ## vek
@@ -340,19 +300,12 @@ def validujDataAnal1(row, request):
             rowDict.update({'vek': int(vek)})
         else:
             rowDict.update({'vek': 0})
-            #messages.error(request, 'Wrong form of vek field')
     elif anonym == 1:
         rowDict.update({'vek': 0})
     
     return rowDict
 
-def validujDataAnal2(column):
-    return 
-
-def validujDataAnal3(column):
-    return
-
-def hasDigit(inputString):
+def obsahujeCislo(inputString):
     return any(char.isdigit() for char in inputString)
 
 def vlozDoDB(rows, id):
@@ -366,12 +319,12 @@ def vlozDoDB(rows, id):
             obj = Analyza2Model()
         elif id == 3: ## Store model for analyza1
             obj = Analyza3Model()
-    makeLog("Dáta boli úspešne uložené v databáze")
+    log("Dáta boli úspešne uložené v databáze")
     doplnVekAPohlavie()
 
 def doplnVekAPohlavie():
     ## Put vek
-    makeLog("Pridáva sa vek na voľné miesta podľa užívateľov")
+    log("Pridáva sa vek na voľné miesta podľa užívateľov")
     allTransactions = Analyza1Model.objects.all().values('pouzivatelId').distinct('pouzivatelId')
     for transaction in allTransactions:
         objects = Analyza1Model.objects.filter(pouzivatelId=transaction['pouzivatelId'], vek=0)
@@ -381,7 +334,7 @@ def doplnVekAPohlavie():
             obj.save()   
 
     ## Put pohlavie
-    makeLog("Pridáva sa pohlavie na voľné miesta podľa užívateľov")
+    log("Pridáva sa pohlavie na voľné miesta podľa užívateľov")
     for transaction in allTransactions:
         objects = Analyza1Model.objects.filter(pouzivatelId=transaction['pouzivatelId'], pohlavie='')
         r = random.randint(0,1)
@@ -493,7 +446,7 @@ def spracovanieDat(vstupy, id):
 
     ## hist cas
     histCas = {}
-    print('DATES',dates)
+    #print('DATES',dates)
     counter = 0
     if len(dates) % 2 == 0:
         for date in range(int(len(dates)/2)):
@@ -516,7 +469,7 @@ def spracovanieDat(vstupy, id):
     ## aggregate query filter
     query = Q()
     queryPsc = Q()
-    if 'pscObvodu' in vstupy and 'all' not in vstupy['vekovaSkupina']:
+    if 'pscObvodu' in vstupy and 'all' not in vstupy['pscObvodu']:
         for k, v in dict(vstupy['pscObvodu']).items():
             sk = PscObvodu.objects.get(psc=v) 
             queryPsc = queryPsc | Q(psc_id=sk.psc)
@@ -551,7 +504,7 @@ def spracovanieDat(vstupy, id):
         ## od min - do max
         dateIntervals = [dt.date() for dt in rrule(interval, dtstart=minDate['casVytvoreniaTransakcie'], until=maxDate['casVytvoreniaTransakcie'])]      
 
-    print('QUERY',query)
+   # print('QUERY',query)
     graf = {}
     queryTime = Q()
     counter = 0
@@ -559,41 +512,31 @@ def spracovanieDat(vstupy, id):
         for dateInterval in range(int(len(dateIntervals)/2)):
             queryTime = Q(casVytvoreniaTransakcie__range=[dateIntervals[counter], dateIntervals[counter+1]])
             # GET 
-            group = Analyza1Model.objects.all().filter(query).filter(queryTime).distinct('pouzivatelId')
+            group = Analyza1Model.objects.all().filter(query).filter(queryTime)#.distinct('pouzivatelId')
             graf.update({dateIntervals[counter]:len(group)})
             counter += 2
     else:
         for dateInterval in range(int(len(dateIntervals)/2)):
             queryTime = Q(casVytvoreniaTransakcie__range=[dateIntervals[counter], dateIntervals[counter+1]])
             # GET 
-            group = Analyza1Model.objects.all().filter(query).filter(queryTime).distinct('pouzivatelId')
+            group = Analyza1Model.objects.all().filter(query).filter(queryTime)#.distinct('pouzivatelId')
             graf.update({dateIntervals[counter]:len(group)})
             counter += 2
         queryTime = Q(casVytvoreniaTransakcie__gte=dateIntervals[len(dateIntervals)-1])
-        group = Analyza1Model.objects.all().filter(query).filter(queryTime).distinct('pouzivatelId')
+        group = Analyza1Model.objects.all().filter(query).filter(queryTime)#.distinct('pouzivatelId')
         graf.update({dateIntervals[len(dateIntervals)-1]:len(group)})
     
     ## Tabulka output
     group = Analyza1Model.objects.all().filter(query).distinct('pouzivatelId')
     vystupy.update({'output': group})        
 
-    #graf = {}
-    #queryTime = Q()
-    #for dateInterval in range(len(dateIntervals)):
-    #    if dateInterval + 1 >= len(dateIntervals):
-    #        queryTime = Q(casVytvoreniaTransakcie__gte=dateIntervals[dateInterval])
-    #    else:
-    #        queryTime = Q(casVytvoreniaTransakcie__range=[dateIntervals[dateInterval], dateIntervals[dateInterval+1]])
-    #    # GET 
-    #    group = Analyza1Model.objects.all().filter(query).filter(queryTime).distinct('pouzivatelId')
-    #    graf.update({dateIntervals[dateInterval]:len(group)})
-    #vystupy.update({'output': group})
 
     grafy['graf']=graf
-    print('VSTUPY:--',vstupy)
-    print('HISTOGRAMY:--',histogramy)
-    print('GRAFY:--',grafy)
-    ## All together
+    #print('VSTUPY:--',vstupy)
+    #print('HISTOGRAMY:--',histogramy)
+    #print('GRAFY:--',grafy)
+    
+    
     vystupy.update({'histogramy':histogramy})
     vystupy.update({'grafy':grafy})
     return vystupy
@@ -707,79 +650,3 @@ def analyzaDat(vystupy):
         inc += 1
 
     return graphsDict
-
-def displayMarcXml(file):
-    records = parse_xml_to_array(file)
-    for record in records:
-        print(record.leader)
-        for field in record.get_fields():
-            if field.is_control_field():
-                print("controlField", field.tag, field.data)
-            else:
-                print("datafield", field.tag, field.indicators)
-                print("subfields:")
-                for k,v in dict(field.subfields_as_dict()).items():
-                    print(k, v)
-        print("--------------------------------")
-
-def defaultInicialization(column):
-    row = {}
-    #print(len(column))
-    columnCounter = 0
-    row.update({'ArlID': column[columnCounter]})
-    columnCounter += 1
-    createTime = dt.strptime(column[columnCounter], '"%Y%m%d%H%M%S.%f"')
-    row.update({'tcreate': createTime})
-    columnCounter += 1
-    row.update({'idRow': column[columnCounter]})
-    columnCounter += 1
-    row.update({'op': column[columnCounter]})
-    columnCounter += 1
-    row.update({'tag': column[columnCounter]})
-    columnCounter += 1
-    row.update({'DatOP': column[columnCounter]})
-    columnCounter += 1
-    row.update({'Pobocka': column[columnCounter]})
-    columnCounter += 1
-    row.update({'holding': column[columnCounter]})
-    columnCounter += 1
-    row.update({'catId': column[columnCounter]})
-    columnCounter += 1
-    row.update({'Tcat_020a': column[columnCounter]})
-    columnCounter += 1
-    row.update({'Tcat_020q': column[columnCounter]})
-    columnCounter += 1
-    if hasDigitAndDot(column[columnCounter]):
-        Tcat_020c = column[columnCounter]
-        columnCounter += 1
-        Tcat_020c = Tcat_020c + "," + column[columnCounter]
-        row.update({'Tcat_020c': Tcat_020c})
-    else:
-        row.update({'Tcat_020c': column[columnCounter]})
-    columnCounter += 1
-    row.update({'Tcat_T015a': column[columnCounter]})
-    columnCounter += 1
-    row.update({'Tcat_T035a': column[columnCounter]})
-    columnCounter += 1
-    row.update({'Tcat_T080a': column[columnCounter]})
-    columnCounter += 1
-    row.update({'isanonym': column[columnCounter]})
-    columnCounter += 1
-    row.update({'pohlavi': column[columnCounter]})
-    columnCounter += 1
-    row.update({'userHash': column[columnCounter]})
-    columnCounter += 1
-    row.update({'userTyp': column[columnCounter]})
-    columnCounter += 1
-    row.update({'psc': column[columnCounter]})
-    columnCounter += 1
-    row.update({'vek': column[columnCounter]})
-    columnCounter += 1
-    row.update({'casVypujceni': column[columnCounter]})
-    columnCounter += 1
-    row.update({'DelkaTransakce': column[columnCounter]})
-    columnCounter += 1
-    row.update({'pocetProlongaci': column[columnCounter]})
-    columnCounter += 1
-    row.update({'pocetUpominek': column[columnCounter]})
-    return row
