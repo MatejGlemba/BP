@@ -30,8 +30,7 @@ class Analyza1Model(models.Model):
     pohlavie = models.CharField(max_length=4, null=True)
     psc_id = models.ForeignKey(PscObvodu, on_delete=models.CASCADE, null=True)
     casVytvoreniaTransakcie = models.DateField(null=True)
-
-## Pripravene na rozsirenie           
+          
 class Analyza2Model(models.Model):
     id = models.AutoField(primary_key=True)
     transakciaId = models.IntegerField()

@@ -30,6 +30,7 @@ graphs = None
 xmlCat = {}
 csvFile = None
 logy = []
+analyzaId = None
 
 def getLogs(request):
     if logy:
@@ -54,6 +55,8 @@ def index(request):
         TypOperacie.objects.all().delete()
         VekovaSkupina.objects.all().delete()
         Analyza1Model.objects.all().delete()
+        Analyza2Model.objects.all().delete()
+        Analyza3Model.objects.all().delete()
 
         log("User Logged in Successfully")
         return render(request, 'main.html', context=context)
@@ -78,15 +81,17 @@ def logout(request):
 
 def analyza(request):
     global importData
+    global analyzaId
     if user:
         if request.method == 'POST' and 'analyza1' in dict(request.POST.items()):
+            analyzaId = 1
             inicializaciaCiselnikov()
             log("Číselníky boli načítané")
             if 'fileXML' in dict(request.FILES.items()):
                 fileXML = request.FILES['fileXML']
                 if fileXML.name.endswith('.xml'):
                     if not xmlCat or not fileXML.name in xmlCat.keys():
-                        xmlSubor(fileXML, 1, request)
+                        xmlSubor(fileXML, request)
                 else:
                     messages.error(request, 'THIS IS NOT A XML FILE')
             fileCSV = request.FILES['fileCSV']
@@ -112,14 +117,82 @@ def analyza(request):
                 'vek' : VekovaSkupina.objects.all(),
             }  
             return render(request, 'main.html', context=context)
-        else:
-            importData = Analyza1Model.objects.all()
+        elif request.method == 'POST' and 'analyza2' in dict(request.POST.items()):
+            analyzaId = 2
+            inicializaciaCiselnikov()
+            log("Číselníky boli načítané")
+            if 'fileXML' in dict(request.FILES.items()):
+                fileXML = request.FILES['fileXML']
+                if fileXML.name.endswith('.xml'):
+                    if not xmlCat or not fileXML.name in xmlCat.keys():
+                        xmlSubor(fileXML, request)
+                else:
+                    messages.error(request, 'THIS IS NOT A XML FILE')
+            fileCSV = request.FILES['fileCSV']
+            if fileCSV.name.endswith('.csv'):
+                try:
+                    get = Analyza2Model.objects.count() > 0
+                    Analyza2Model.objects.all().delete()
+                except ObjectDoesNotExist: 
+                    get = None     
+                csvSubor(fileCSV, 2, request)
+            else:
+                messages.error(request, 'THIS IS NOT A CSV FILE')
+            importData = Analyza2Model.objects.all()
             paginator = Paginator(importData, 5)
             page = request.GET.get('page', 1)
             data = paginator.page(page)
             context = {
                 'login' : user["login"],
                 'imported' : True,
+                'data' : data,
+                'analyzaId' : 2,
+                'konspekt' : Konspekt.objects.all(),
+                'operacia' : TypOperacie.objects.all(),
+            }  
+            return render(request, 'main.html', context=context)
+        elif request.method == 'POST' and 'analyza3' in dict(request.POST.items()):
+            analyzaId = 3
+            inicializaciaCiselnikov()
+            log("Číselníky boli načítané")
+            if 'fileXML' in dict(request.FILES.items()):
+                fileXML = request.FILES['fileXML']
+                if fileXML.name.endswith('.xml'):
+                    if not xmlCat or not fileXML.name in xmlCat.keys():
+                        xmlSubor(fileXML, request)
+                else:
+                    messages.error(request, 'THIS IS NOT A XML FILE')
+            fileCSV = request.FILES['fileCSV']
+            if fileCSV.name.endswith('.csv'):
+                try:
+                    get = Analyza3Model.objects.count() > 0
+                    Analyza3Model.objects.all().delete()
+                except ObjectDoesNotExist: 
+                    get = None     
+                csvSubor(fileCSV, 3, request)
+            else:
+                messages.error(request, 'THIS IS NOT A CSV FILE')
+            importData = Analyza3Model.objects.all()
+            paginator = Paginator(importData, 5)
+            page = request.GET.get('page', 1)
+            data = paginator.page(page)
+            context = {
+                'login' : user["login"],
+                'imported' : True,
+                'data' : data,
+                'analyzaId' : 3,
+                'konspekt' : Konspekt.objects.all(),
+                'vek' : VekovaSkupina.objects.all(),
+            }  
+            return render(request, 'main.html', context=context)
+        else:
+            paginator = Paginator(importData, 5)
+            page = request.GET.get('page', 1)
+            data = paginator.page(page)
+            context = {
+                'login' : user["login"],
+                'imported' : True,
+                'analyzaId' : analyzaId,
                 'data' : data,
                 'psc' : PscObvodu.objects.all(),
                 'vek' : VekovaSkupina.objects.all(),
@@ -212,10 +285,11 @@ def inicializaciaCiselnikov():
     setattr(v, 'skupina', "71-100")
     v.save()
 
-def xmlSubor(file, id, request):
+def xmlSubor(file, request):
     log("Načítava sa XML súbor")
     records = parse_xml_to_array(file)
     xmlCat.update({file.name: records})
+    print(xmlCat[file.name])
     log("XML súbor je načítaný")
 
 def csvSubor(file, id, request):
@@ -229,6 +303,10 @@ def csvSubor(file, id, request):
         if len(row) <= 26:
             if id == 1:
                 rows[rowCounter] = validujDataAnal1(row, request)
+            elif id == 2:
+                rows[rowCounter] = validujDataAnal2(row, request)
+            elif id == 3:
+                rows[rowCounter] = validujDataAnal3(row, request)
             rowCounter += 1
     log("Dáta z CSV súboru boli úspešne validované")
     vlozDoDB(rows, id)
@@ -305,22 +383,66 @@ def validujDataAnal1(row, request):
     
     return rowDict
 
+def validujDataAnal2(row, request):
+    rowDict = {}
+    return rowDict
+
+def validujDataAnal3(row, request):
+    rowDict = {}
+    columnCounter = 0
+    ## transaction Id
+    transactionId = row[columnCounter]
+
+    columnCounter += 8
+    ## konspekt Id 
+    kospektId = row[columnCounter]
+
+
+    columnCounter += 7
+    anonym = row[columnCounter]
+    if len(anonym) == 3 and anonym[1].isdigit() and int(anonym[1]) in [0, 1]:
+        anonym = int(anonym[1])
+
+    columnCounter += 5
+    ## vekovaSkupina Id 
+    vekovaSkupinaId = row[columnCounter]
+    if anonym == 0: 
+        vek = row[columnCounter].replace('"', '')
+        if vek.isdigit() and int(vek) >= 0:   
+            rowDict.update({'vek': int(vek)})
+        else:
+            rowDict.update({'vek': 0})
+    elif anonym == 1:
+        rowDict.update({'vek': 0})
+
+
+    #---------------------------------------------
+    return rowDict
+
 def obsahujeCislo(inputString):
     return any(char.isdigit() for char in inputString)
 
 def vlozDoDB(rows, id):
-    for key, value in rows.items():
-        if id == 1: ## Store model for analyza1
+    if id == 1: ## Store model for analyza1
+        for key, value in rows.items():
             obj = Analyza1Model()
             for key, value in value.items():
                 setattr(obj, key, value)
             obj.save()
-        elif id == 2: ## Store model for analyza1
+        doplnVekAPohlavie()
+    elif id == 2: ## Store model for analyza2
+        for key, value in rows.items():
             obj = Analyza2Model()
-        elif id == 3: ## Store model for analyza1
+            for key, value in value.items():
+                setattr(obj, key, value)
+            obj.save()
+    elif id == 3: ## Store model for analyza3
+        for key, value in rows.items():
             obj = Analyza3Model()
+            for key, value in value.items():
+                setattr(obj, key, value)
+            obj.save()
     log("Dáta boli úspešne uložené v databáze")
-    doplnVekAPohlavie()
 
 def doplnVekAPohlavie():
     ## Put vek
