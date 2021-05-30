@@ -196,7 +196,7 @@
                 <!-- 			Uprava vstupov 				-->
                 <div class="row container alignCenter">
                     <div class="col-md-8">	 
-                        <form role="form" action="{% url 'analyzaVystup' id=1 %}#table1" method="POST">
+                        <form role="form" action="{% url 'analyzaVystup' id=2 %}#table1" method="POST">
                             {% csrf_token %}
                             <div class="row">
                                 <div class="col-md-4">
@@ -306,7 +306,7 @@
                                         <td>{{ d.autor }}</td>
                                         <td>{{ d.vydavatelstvo }}</td>
                                         <td>{{ d.konspekt_id.nazov }}</td>
-                                        <td>{{ d.typOperacia_id.nazov }}</td>
+                                        <td>{{ d.typOperacie_id.nazov }}</td>
                                     </tr>
                                     {% endfor%}
                                 </tbody>
@@ -373,7 +373,7 @@
                 <!-- 			Uprava vstupov 				-->
                 <div class="row container alignCenter">
                     <div class="col-md-8">	 
-                        <form role="form" action="{% url 'analyzaVystup' id=1 %}#table1" method="POST">
+                        <form role="form" action="{% url 'analyzaVystup' id=3 %}#table1" method="POST">
                             {% csrf_token %}
                             <div class="row">
                                 <div class="col-md-4">
@@ -399,14 +399,14 @@
                                     <div class="form-group">
                                         <div class="dropdown">  
                                             <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton2" data-toggle="dropdown">
-                                                Typ Operácie
+                                                Konspekt
                                             </button>
                                             <div class="dropdown-menu" aria-labelledby="dropdownMenuButton2" style="overflow-y: auto; max-height: 400px;">
                                                 <div class="row" style="width: max-content;">
                                                     <div class="col-md-12">
-                                                        <div><input type="checkbox" style="margin: 5px;" name="operacia-all" id="select-operacia-all" /><label style="margin-right: 5px;">Vyber všetky</label></div>
-                                                        {% for o in operacia %}
-                                                        <div><input type="checkbox" style="margin: 5px;" name="operacia_{{o.id}}"><label style="margin-right: 5px;">{{ o.nazov }}</label></div>
+                                                        <div><input type="checkbox" style="margin: 5px;" name="konspekt-all" id="select-konspekt-all" /><label style="margin-right: 5px;">Vyber všetky</label></div>
+                                                        {% for k in konspekt %}
+                                                        <div><input type="checkbox" style="margin: 5px;" name="konspekt_{{k.id}}"><label style="margin-right: 5px;">{{ k.nazov }}</label></div>
                                                         {% endfor %}
                                                     </div>
                                                 </div>
@@ -414,39 +414,6 @@
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="row">
-                                <div class='col-md-4'>
-                                    <div class="form-group">
-                                        <label>OD:</label>
-                                        <div class='input-group date' id='datetimepicker6'>
-                                        <input type="date" placeholder="" name="od">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class='col-md-4'>
-                                    <div class="form-group">
-                                        <label>DO:</label>
-                                        <div class='input-group date' id='datetimepicker7'>
-                                        <input type="date" placeholder="" name="do">
-                                        </div>
-                                    </div>
-                                </div> 
-                                <div class='col-md-4'>
-                                    <div class="form-group">
-                                        <label>Rozdelenie</label>
-                                        <div>
-                                            <label>
-                                                <input type="checkbox" class="radio" value="1" name="intervalRok" />Ročne</label>
-                                            <label>
-                                                <input type="checkbox" class="radio" value="1" name="intervalMesiac" />Mesačne</label>
-                                            <label>
-                                                <input type="checkbox" class="radio" value="1" name="intervalTyzden" />Týždenne</label>
-                                            <label>
-                                                <input type="checkbox" class="radio" value="1" name="intervalDen" />Denne</label>
-                                            </div>
-                                    </div>
-                                </div> 
                             </div>
                             <hr> 
                             <div class="row"> 

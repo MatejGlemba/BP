@@ -17,6 +17,24 @@ document.getElementById('select-psc-all').onclick = function() {
     }
 }
 
+document.getElementById('select-konspekt-all').onclick = function() {
+    var inputs = document.getElementsByTagName('input');
+    for (var input of inputs) {
+        if(input.name.startsWith('konspekt_')) {
+            input.checked = this.checked;
+        }
+    }
+}
+
+document.getElementById('select-operacia-all').onclick = function() {
+    var inputs = document.getElementsByTagName('input');
+    for (var input of inputs) {
+        if(input.name.startsWith('operacia_')) {
+            input.checked = this.checked;
+        }
+    }
+}
+
 
 $("input:checkbox").on('click', function() {
     var $box = $(this);
