@@ -43,88 +43,88 @@
           {% endfor %}
         </ul>
         {% endif %}
-        <div class="row globalRowWidth">
-            {% if login %}
-            <div class="col-md-4">
-                <div class="row">  
-                    <div class="col-md-12">
-                        <div class="row container alignCenter">
-                            <div class="col-md-8">
-                                <form role="form" action="{% url 'analyza' %}#table1" method="POST" enctype="multipart/form-data">
-                                    {% csrf_token %}
-                                    <div class="form-group">
-                                        <label for="inputFile">Nahraj súbor transakcií</label>
-                                        <input placeholder="transakcie.csv" type="file" class="form-control-file" name="fileCSV" id="inputFileTran" required>
-                                        <p class="help-block">Podporovaný typ: .csv</p>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="inputFile">Nahraj katalógový súbor</label>
-                                        <input placeholder="katalog.xml" type="file" class="form-control-file" name="fileXML" id="inputFileXml">
-                                        <p class="help-block">Podporovaný typ: .xml</p>
-                                    </div>
-                                    <!--<div class="form-group">
-                                        <label for="opacLink">OPAC url link (nepodporovaný)</label>
-                                        <input type="url" class="form-control" id="opacLink" readonly>
-                                    </div>--> 
-                                    <div class="form-group">
-                                        <label>Vyber analýzu</label>
-                                        <div>
-                                            <label>
-                                                <input type="checkbox" class="radio" value="1" name="analyza1"/>Analýza 1</label>
-                                            <label>
-                                                <input type="checkbox" class="radio" value="2" name="analyza2"/>Analýza 2</label>
-                                            <label>
-                                                <input type="checkbox" class="radio" value="3" name="analyza3"/>Analýza 3</label>
+        {% if login %}
+            <div class="row globalRowWidth">
+                <div class="col-md-4">
+                    <div class="row">  
+                        <div class="col-md-12">
+                            <div class="row container alignCenter">
+                                <div class="col-md-8">
+                                    <form role="form" action="{% url 'analyza' %}#table1" method="POST" enctype="multipart/form-data">
+                                        {% csrf_token %}
+                                        <div class="form-group">
+                                            <label for="inputFile">Nahraj súbor transakcií</label>
+                                            <input placeholder="transakcie.csv" type="file" class="form-control-file" name="fileCSV" id="inputFileTran" required>
+                                            <p class="help-block">Podporovaný typ: .csv</p>
                                         </div>
-                                    </div>
-                                    <div style="float: right; padding: 15px">
-                                        <button type="submit" class="btn btn-primary">Potvrď</button>
-                                    </div> 
-                                </form>
-                                <hr>
+                                        <div class="form-group">
+                                            <label for="inputFile">Nahraj katalógový súbor</label>
+                                            <input placeholder="katalog.xml" type="file" class="form-control-file" name="fileXML" id="inputFileXml">
+                                            <p class="help-block">Podporovaný typ: .xml</p>
+                                        </div>
+                                        <!--<div class="form-group">
+                                            <label for="opacLink">OPAC url link (nepodporovaný)</label>
+                                            <input type="url" class="form-control" id="opacLink" readonly>
+                                        </div>--> 
+                                        <div class="form-group">
+                                            <label>Vyber analýzu</label>
+                                            <div>
+                                                <label>
+                                                    <input type="checkbox" class="radio" value="1" name="analyza1"/>Analýza 1</label>
+                                                <label>
+                                                    <input type="checkbox" class="radio" value="2" name="analyza2"/>Analýza 2</label>
+                                                <label>
+                                                    <input type="checkbox" class="radio" value="3" name="analyza3"/>Analýza 3</label>
+                                            </div>
+                                        </div>
+                                        <div style="float: right; padding: 15px">
+                                            <button type="submit" class="btn btn-primary">Potvrď</button>
+                                        </div> 
+                                    </form>
+                                    <hr>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-                <div class="row">
-                    <div class="col-md-12" style="height: 100%;">
-                        <h3 style="text-align: left;">Logy</h3>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-md-12">
-                        <div class="logs">
-                            <ol id="log" class="list-unstyled removeBottomMargin">
-                                <li class="list-item"></li>
-                            </ol>
+                    <div class="row">
+                        <div class="col-md-12" style="height: 100%;">
+                            <h3 style="text-align: left;">Logy</h3>
                         </div>
                     </div>
-                </div>   
-            </div>
-            {% endif %}
-            {% if login %}
-                <div class="col-md-8">
-                    {% block main %}{% endblock %}
-                </div>
-            {% else %}
-            <div class="col-md-12">
-                <div class="loginPadding">
-                    <form action="{% url 'index' %}" role="form" method="post" class="from-group">
-                        {% csrf_token %}
-                        <div class="form-group">
-                        <label for="exampleInputLogin1">Login</label>
-                        <input type="login" name="login" placeholder="admin" class="form-control" id="exampleInputLogin1" required>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="logs">
+                                <ol id="log" class="list-unstyled removeBottomMargin">
+                                    <li class="list-item"></li>
+                                </ol>
+                            </div>
                         </div>
-                        <div class="form-group">
-                        <label for="exampleInputPassword1">Password</label>
-                        <input type="password" name="password" placeholder="******" class="form-control" id="exampleInputPassword1" required>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Submit</button>
-                    </form>
+                    </div>   
                 </div>
             </div>
-            {% endif %}
-        </div>
+        {% endif %}
+        {% if login %}
+            {% block main %}{% endblock %}
+        {% else %}
+            <div class="row globalRowWidth">
+                <div class="col-md-12">
+                    <div class="loginPadding">
+                        <form action="{% url 'index' %}" role="form" method="post" class="from-group">
+                            {% csrf_token %}
+                            <div class="form-group">
+                            <label for="exampleInputLogin1">Login</label>
+                            <input type="login" name="login" placeholder="admin" class="form-control" id="exampleInputLogin1" required>
+                            </div>
+                            <div class="form-group">
+                            <label for="exampleInputPassword1">Password</label>
+                            <input type="password" name="password" placeholder="******" class="form-control" id="exampleInputPassword1" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Submit</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
     </main>
     <div class="footer">
         <p class="mr-4 removeBottomMargin">© Matej Glemba</p>

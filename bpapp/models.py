@@ -22,6 +22,14 @@ class VekovaSkupina(models.Model):
     id = models.IntegerField(primary_key=True)
     skupina = models.CharField(max_length=7)
 
+# Catalog
+class Katalog(models.Model):
+    id = models.AutoField(primary_key=True)
+    katalogId = models.CharField(max_length=20, null=True)
+    konspekt = models.IntegerField(null=True)
+    autor = models.CharField(max_length=400, null=True)
+    vydavatelstvo = models.CharField(max_length=400, null=True)
+
 # Modely analýz
 class Analyza1Model(models.Model):
     id = models.AutoField(primary_key=True)
@@ -37,8 +45,8 @@ class Analyza2Model(models.Model):
     typOperacie_id = models.ForeignKey(TypOperacie, on_delete=models.CASCADE)
     casVytvoreniaTransakcie = models.DateField()
     dlzkaVypozicky = models.IntegerField()
-    autor = models.CharField(max_length=50)
-    vydavatelstvo = models.CharField(max_length=50)
+    autor = models.CharField(max_length=400)
+    vydavatelstvo = models.CharField(max_length=400)
     konspekt_id = models.ForeignKey(Konspekt, on_delete=models.CASCADE)
 
 class Analyza3Model(models.Model):

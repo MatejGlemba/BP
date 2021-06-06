@@ -1,7 +1,7 @@
 # Create your views here.
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
-from .models import User, PscObvodu, VekovaSkupina, Konspekt, TypOperacie, Analyza1Model, Analyza2Model, Analyza3Model
+from .models import User, PscObvodu, VekovaSkupina, Konspekt, TypOperacie, Analyza1Model, Analyza2Model, Analyza3Model, Katalog
 from django.contrib import messages
 from django.urls import reverse
 from django.contrib.sessions.models import Session 
@@ -58,6 +58,7 @@ def index(request):
         Analyza1Model.objects.all().delete()
         Analyza2Model.objects.all().delete()
         Analyza3Model.objects.all().delete()
+        #Katalog.objects.all().delete()
 
         log("User Logged in Successfully")
         return render(request, 'main.html', context=context)
@@ -92,8 +93,10 @@ def analyza(request):
             if 'fileXML' in dict(request.FILES.items()):
                 fileXML = request.FILES['fileXML']
                 if fileXML.name.endswith('.xml'):
-                    if not xmlCat:
-                        xmlSubor(fileXML, request)
+                    if Katalog.objects.exists() and Katalog.objects.count() > 0:
+                        print("som tu")
+                    else:
+                        xmlSubor(fileXML, request)   
                 else:
                     messages.error(request, 'THIS IS NOT A XML FILE')
             fileCSV = request.FILES['fileCSV']
@@ -126,7 +129,9 @@ def analyza(request):
             if 'fileXML' in dict(request.FILES.items()):
                 fileXML = request.FILES['fileXML']
                 if fileXML.name.endswith('.xml'):
-                    if not xmlCat:
+                    if Katalog.objects.exists() and Katalog.objects.count() > 0:
+                        print("som tu")
+                    else:
                         xmlSubor(fileXML, request)
                 else:
                     messages.error(request, 'THIS IS NOT A XML FILE')
@@ -160,7 +165,9 @@ def analyza(request):
             if 'fileXML' in dict(request.FILES.items()):
                 fileXML = request.FILES['fileXML']
                 if fileXML.name.endswith('.xml'):
-                    if not xmlCat:
+                    if Katalog.objects.exists() and Katalog.objects.count() > 0:
+                        print("som tu")
+                    else:
                         xmlSubor(fileXML, request)
                 else:
                     messages.error(request, 'THIS IS NOT A XML FILE')
@@ -334,7 +341,47 @@ def xmlSubor(file, request):
     global xmlCat
     log("Načítava sa XML súbor")
     records = parse_xml_to_array(file)
-    xmlCat = records
+    #xmlCat = records
+    for record in records:
+        obj = Katalog()
+        for recordField in record.get_fields('001'):
+            if recordField.is_control_field():
+                setattr(obj, "katalogId", recordField.value())
+       
+        konspektField = record.get_fields('072')
+        if not konspektField:
+            konspektField = record.get_fields('C72')
+            if not konspektField:
+                setattr(obj, "konspekt", None)
+            else:
+                subfield = konspektField[0].get_subfields('9')
+                try:
+                    if subfield[0] and subfield[0].isdigit():
+                        setattr(obj, "konspekt", subfield[0])
+                except:
+                    setattr(obj, "konspekt", None)
+        else:   
+            subfield = konspektField[0].get_subfields('9')
+            try:
+                if subfield[0] and subfield[0].isdigit():
+                    setattr(obj, "konspekt", subfield[0])
+            except:
+                setattr(obj, "konspekt", None)
+
+        ## autor
+        autorField = record.get_fields('100')
+        if not autorField:
+            setattr(obj, "autor", None)
+        else:
+            setattr(obj, "autor", autorField[0].get_subfields('a')[0])
+        
+        ## vydavatelstvo
+        vydavField = record.publisher()
+        if not vydavField:
+            setattr(obj, "vydavatelstvo", None)
+        else:
+            setattr(obj, "vydavatelstvo", vydavField)
+        obj.save()
     log("XML súbor je načítaný")
 
 def csvSubor(file, id, request):
@@ -344,15 +391,23 @@ def csvSubor(file, id, request):
     next(io_string) 
     rows = {}
     rowCounter = 0
+    maxRowCounter = 0
     for row in csv.reader(io_string, delimiter=',', quotechar="|"):
         if len(row) <= 26:
             if id == 1:
                 rows[rowCounter] = validujDataAnal1(row, request)
             elif id == 2:
                 rows[rowCounter] = validujDataAnal2(row, request)
+                if not rows[rowCounter]:
+                    continue
             elif id == 3:
                 rows[rowCounter] = validujDataAnal3(row, request)
+                if not rows[rowCounter]:
+                    continue
             rowCounter += 1
+            #if rowCounter.toString().length == 3 :
+            #    maxRowCounter = rowCounter
+            #    log("Bolo validovaných ", maxRowCounter, " záznamov.")
     log("Dáta z CSV súboru boli úspešne validované")
     vlozDoDB(rows, id)
 
@@ -443,37 +498,47 @@ def validujDataAnal2(row, request):
         tcreate = tcreate[1:5] + '-' + tcreate[5:7] + '-' + tcreate[7:9]
         rowDict.update({'casVytvoreniaTransakcie': tcreate})
     else:
-        messages.info(request, 'Wrong form of tcreate field')
+        rowDict = None
     
+    if not rowDict:
+        return rowDict
 
     columnCounter += 2
     ## typ Operacie
     typOp = row[columnCounter]
     if len(typOp) <= 2:
-        obj = TypOperacie.objects.get(id=typOp)
-        rowDict.update({'typOperacie_id': obj})
+        try:
+            obj = TypOperacie.objects.get(id=typOp)
+            rowDict.update({'typOperacie_id': obj})
+        except ObjectDoesNotExist:
+            rowDict = None
 
+    if not rowDict:
+        return rowDict    
 
     columnCounter += 5
     ## konspekt, autor, vydavatelstvo
-    konspektId = row[columnCounter].split("*")[1]
-    for record in xmlCat:
-        for recordField in record.get_fields('001'):
-            if recordField.is_control_field() and recordField.value() == konspektId:
-                ## konspekt
-                konspektField = record.get_fields('072')[0]
-                konspektSubfield = konspektField.get_subfields('x', '9')
-                kon = Konspekt.objects.get(id=konspektSubfield[1])
-                rowDict.update({'konspekt_id': kon})
+    if obsahujeCislo(row[columnCounter]):
+        konspektId = row[columnCounter].split("*")[1]
+        try:
+            record = Katalog.objects.get(katalogId=konspektId)
+            if record.konspekt and record.autor and record.vydavatelstvo:
+                try:
+                    kon = Konspekt.objects.get(id=record.konspekt)
+                    rowDict.update({'konspekt_id': kon})      
+                    rowDict.update({'autor': record.autor})
+                    rowDict.update({'vydavatelstvo': record.vydavatelstvo})
+                except Konspekt.DoesNotExist:
+                    rowDict = None
+            else:
+                rowDict = None
+        except Katalog.DoesNotExist:
+            rowDict = None
+    else:
+        rowDict = None
 
-                ## autor
-                autorField = record.get_fields('100')[0]
-                autorSubField = autorField.get_subfields('a')
-                rowDict.update({'autor': autorSubField[0]})
-                
-                ## vydavatelstvo
-                vydavField = record.publisher()
-                rowDict.update({'vydavatelstvo': vydavField})
+    if not rowDict:
+        return rowDict
 
     columnCounter += 3
     if obsahujeCislo(row[columnCounter]) and obsahujeCislo(row[columnCounter + 1]) and len(row[columnCounter+1]) == 3: ## "285 Kč" 
@@ -484,6 +549,11 @@ def validujDataAnal2(row, request):
     dlzkaVyp = row[columnCounter]
     if dlzkaVyp.isdigit():
         rowDict.update({'dlzkaVypozicky': int(dlzkaVyp)})
+    else:
+        rowDict = None
+    
+    if not rowDict:
+        return rowDict
    
     return rowDict
 
@@ -499,14 +569,25 @@ def validujDataAnal3(row, request):
     
     columnCounter += 8
     ## konspekt Id - cbvk_us_cat*m0173078
-    konspektId = row[columnCounter].split("*")[1]
-    for record in xmlCat:
-        for recordField in record.get_fields('001'):
-            if recordField.is_control_field() and recordField.value() == konspektId:
-                konspektField = record.get_fields('072')[0]
-                konspektSubfield = konspektField.get_subfields('x', '9')
-                kon = Konspekt.objects.get(id=konspektSubfield[1])
-                rowDict.update({'konspekt_id': kon})
+    if obsahujeCislo(row[columnCounter]):
+        konspektId = row[columnCounter].split("*")[1]
+        try:
+            record = Katalog.objects.get(katalogId=konspektId)
+            if record.konspekt:
+                try:
+                    kon = Konspekt.objects.get(id=record.konspekt)
+                    rowDict.update({'konspekt_id': kon})
+                except Konspekt.DoesNotExist:
+                    rowDict = None     
+            else:
+                rowDict = None
+        except Katalog.DoesNotExist:
+            rowDict = None
+    else:
+        rowDict = None
+
+    if not rowDict:
+        return rowDict
 
     columnCounter += 3
     if obsahujeCislo(row[columnCounter]) and obsahujeCislo(row[columnCounter + 1]) and len(row[columnCounter+1]) == 3: ## "285 Kč" 
@@ -1025,8 +1106,9 @@ def spracovanieDat(vstupy, id):
         # print('QUERY',query)
         graf = {}
         # GET 
-        group = Analyza3Model.objects.all().filter(query)#.distinct('pouzivatelId')
-        #graf.update({dateIntervals[counter]:len(group)})
+        group = Analyza3Model.objects.all().filter(query)
+        for g in group:
+            graf.update({g.konspekt_id.id:g.vekovaSkupina_id.id})
         grafy['graf']=graf
 
         ## Tabulka output
@@ -1127,8 +1209,8 @@ def analyzaDat(vystupy, id):
             plt.gcf().autofmt_xdate()
             plt.savefig(nazov)
             url = urlFront + 'histPart' + str(inc) + '.png'
-            pair.update({'url' : url })
             pair = {}
+            pair.update({'url' : url })
             if k == 'histVek':
                 pair.update({'popis': "Histogram všetkých transakcií používateľov podľa vekových skupín."})
                 plt.xlabel('Veková skupina', fontsize=18)
@@ -1229,8 +1311,8 @@ def analyzaDat(vystupy, id):
             plt.gcf().autofmt_xdate()
             plt.savefig(nazov)
             url = urlFront + 'histPart' + str(inc) + '.png'
-            pair.update({'url' : url })
             pair = {}
+            pair.update({'url' : url })
             if k == 'histTypOp':
                 pair.update({'popis': "Histogram všetkých transakcií podľa typu operácie."})
                 plt.xlabel('Typ Operácie', fontsize=18)
@@ -1245,7 +1327,76 @@ def analyzaDat(vystupy, id):
             inc += 1
 
     elif id == 3:
-        
+         ## Hlavne Grafy
+        for k,graf in vystupy['grafy'].items():
+            ## - vstupne polia pre hlavne grafy
+            y = list(graf.values())
+            #x = []
+            #for key in list(graf.keys()):
+            #    x.append(key.strftime("%m/%d/%Y"))
+            x = list(graf.keys())
+            print("y",y)
+            print("x",x)
+            ## -------------Main Hist----------------
+            plt.bar(graf.keys(), graf.values(), color='g')
+            plt.suptitle('Histogram', fontsize=20)
+            plt.xlabel('Konspekt', fontsize=18)
+            plt.ylabel('Veková Skupina', fontsize=16)
+            plt.gcf().autofmt_xdate()
+            nazov = path + 'mainHist.png'
+            plt.savefig(nazov)
+            url = urlFront + 'mainHist.png'
+            pair = {}
+            pair.update({'url': url })
+            pair.update({'popis': "Histogram počtu transakcií podľa vstupných parametrov [Konspekt, Veková skupina] vzhľadom na čas ich vytvorenia, ktorý je rozdelený do rozsahu podľa vstupného parametra (defaulnte je to od najstaršej transakcie po najnovšiu) v intervaloch podľa vstupného parametra (defaultne to je Denne)."})
+            graphsDict.update({'pairMainHist': pair })
+            plt.close()
+            
+            ## ---------------Main Polynomial--------
+            lenX = len(x)
+            model = np.poly1d(np.polyfit(x, y, 3))
+            line = np.linspace(x[0], x[lenX-1], 10)
+            fig, ax = plt.subplots() 
+            plt.scatter(x, y)
+            plt.plot(line, model(line))
+            plt.suptitle('Polynomialna regresia', fontsize=20)
+            plt.xlabel('Konspekt', fontsize=18)
+            plt.ylabel('Veková Skupina', fontsize=16)
+            plt.gcf().autofmt_xdate()
+            nazov = path + 'polyMain.png'
+            plt.savefig(nazov)
+            url = urlFront + 'polyMain.png'
+            pair = {}
+            pair.update({'url': url })
+            pair.update({'popis': "Graf polynomialnej funkcie, ktorá zodpovedá vstupným parametrom. Ak neboli zadané žiadne, je aplikovaná na všetky dáta. Polynomiálna regresia je vhodnejšia na presnejšiu aproximáciu vstupných nezávislých dát (os x), čím sa snaží čo najlepšie predikovať závislé dáta. Ak sú ale veľké výkyvy hodnôt, môže byť nepresná. V tomto grafe je polynomialna funkcia 3 stupňa." })
+            graphsDict.update({'pairPolyMain': pair })
+            plt.close()
+
+            ## ---------------Main Linear-------------
+            slope, intercept, r, p, std_err = stats.linregress(x, y)
+            def func(x):
+                return slope * x + intercept
+            model = list(map(func, x))
+            fig, ax = plt.subplots()
+            ax.scatter(x, y)
+            ax.plot(x, model)
+            l = matplotlib.dates.AutoDateLocator()
+            f = matplotlib.dates.AutoDateFormatter(l)
+            ax.xaxis.set_major_locator(l)
+            ax.xaxis.set_major_formatter(f)
+            plt.suptitle('Lineárna regresia', fontsize=20)
+            plt.xlabel('Konspekt', fontsize=18)
+            plt.ylabel('Veková Skupina', fontsize=16)
+            plt.gcf().autofmt_xdate()
+            nazov = path + 'linMain.png'
+            plt.savefig(nazov)
+            url = urlFront + 'linMain.png'
+            pair = {}
+            pair.update({'url': url })
+            pair.update({'popis': "Graf lineárnej regresie. Lineárna regresia je základným typom analýzy na princípe \"Supervised learning\". Na rozdieľ od polynomiálnej funkcie, lineárna popisuje lineárny vzťah medzi závislou a nezávislou hodnotou."})
+            graphsDict.update({'pairLinMain': pair })
+            plt.close()
+
         # POMOCNE HISTOGRAMY
         inc = 1
         for k,v in vystupy['histogramy'].items():
@@ -1256,8 +1407,8 @@ def analyzaDat(vystupy, id):
             plt.gcf().autofmt_xdate()
             plt.savefig(nazov)
             url = urlFront + 'histPart' + str(inc) + '.png'
-            pair.update({'url' : url })
             pair = {}
+            pair.update({'url' : url })
             if k == 'histVek':
                 pair.update({'popis': "Histogram všetkých transakcií používateľov podľa vekových skupín."})
                 plt.xlabel('Veková skupina', fontsize=18)
