@@ -88,3 +88,8 @@
 .globalRowWidth {
     max-width: 100%;
 }
+
+.alignLabel {
+    text-align: center;
+    size: 3;
+}

@@ -9,10 +9,12 @@ import csv, io, os, base64, random
 from django.core.paginator import Paginator
 import datetime as dt
 import xml.etree.ElementTree as ET
+from psycopg2 import sql
 from pymarc import MARCReader, parse_xml_to_array, Record
 import xmltodict, numpy as np, pandas as pd, matplotlib.pyplot as plt
 import matplotlib.pylab as plb
 import matplotlib
+import time
 from matplotlib.dates import date2num
 from pylab import rcParams
 from scipy import stats
@@ -27,6 +29,7 @@ from django.core.exceptions import ObjectDoesNotExist
 user = {}
 importData = None
 vystupyData = None
+vystupyData2 = None
 graphs = None
 xmlCat = None
 csvFile = None
@@ -60,7 +63,23 @@ def index(request):
         Analyza3Model.objects.all().delete()
         #Katalog.objects.all().delete()
 
-        log("User Logged in Successfully")
+        kat = None
+        try:
+            kat = Katalog.objects.count() > 0
+        except ObjectDoesNotExist: 
+            kat = None
+
+        if kat:
+            context = {
+                'login' : user["login"],
+                'katalog': True
+            }
+        else:
+            context = {
+                'login' : user["login"],
+                'katalog': False
+            }
+        log("Používateľ bol úspešne prihlásený")
         return render(request, 'main.html', context=context)
     elif user:
         context = {
@@ -109,6 +128,7 @@ def analyza(request):
                 csvSubor(fileCSV, 1, request)
             else:
                 messages.error(request, 'THIS IS NOT A CSV FILE')
+            time.sleep(4)
             importData = Analyza1Model.objects.all()
             paginator = Paginator(importData, 5)
             page = request.GET.get('page', 1)
@@ -145,6 +165,7 @@ def analyza(request):
                 csvSubor(fileCSV, 2, request)
             else:
                 messages.error(request, 'THIS IS NOT A CSV FILE')
+            time.sleep(4)
             importData = Analyza2Model.objects.all()
             paginator = Paginator(importData, 5)
             page = request.GET.get('page', 1)
@@ -168,6 +189,7 @@ def analyza(request):
                     if Katalog.objects.exists() and Katalog.objects.count() > 0:
                         print("som tu")
                     else:
+                        print("nahraj XML")
                         xmlSubor(fileXML, request)
                 else:
                     messages.error(request, 'THIS IS NOT A XML FILE')
@@ -181,6 +203,7 @@ def analyza(request):
                 csvSubor(fileCSV, 3, request)
             else:
                 messages.error(request, 'THIS IS NOT A CSV FILE')
+            time.sleep(4)
             importData = Analyza3Model.objects.all()
             paginator = Paginator(importData, 5)
             page = request.GET.get('page', 1)
@@ -202,12 +225,17 @@ def analyza(request):
                 'login' : user["login"],
                 'imported' : True,
                 'analyzaId' : analyzaId,
-                'data' : data
+                'data' : data,
+                'psc' : PscObvodu.objects.all(),
+                'vek' : VekovaSkupina.objects.all(),
+                'konspekt' : Konspekt.objects.all(),
+                'operacia' : TypOperacie.objects.all(),
             }
             return render(request, 'main.html', context=context)   
 
 def analyzaVystup(request, id):
     global vystupyData
+    global vystupyData2
     global graphs
     
     if user:
@@ -261,6 +289,7 @@ def analyzaVystup(request, id):
                 log("Vstupy do analýzy boli spracované")
                 vystupy = spracovanieDat(vstupy, id)
                 vystupyData = vystupy['output'] 
+                vystupyData2 = vystupy['output2']
                 log("Dáta na základe vstupov boli agregované")
                 graphs = analyzaDat(vystupy, id)
                 log("Výstupné sústavy z analýzy boli vytvorené")
@@ -271,6 +300,7 @@ def analyzaVystup(request, id):
                 'login' : user["login"],
                 'imported': True,
                 'data' : data,
+                'dataAnalyza3' : vystupyData2,
                 'analyzaId' : id,
                 'graphs' : graphs,
                 'konspekt' : Konspekt.objects.all(),
@@ -390,25 +420,29 @@ def csvSubor(file, id, request):
     io_string = io.StringIO(data)
     next(io_string) 
     rows = {}
+    failCounter = 0
     rowCounter = 0
     maxRowCounter = 0
     for row in csv.reader(io_string, delimiter=',', quotechar="|"):
         if len(row) <= 26:
             if id == 1:
                 rows[rowCounter] = validujDataAnal1(row, request)
+                if not rows[rowCounter]:
+                    failCounter += 1
+                    continue
             elif id == 2:
                 rows[rowCounter] = validujDataAnal2(row, request)
                 if not rows[rowCounter]:
+                    failCounter += 1
                     continue
             elif id == 3:
                 rows[rowCounter] = validujDataAnal3(row, request)
                 if not rows[rowCounter]:
+                    failCounter += 1
                     continue
             rowCounter += 1
-            #if rowCounter.toString().length == 3 :
-            #    maxRowCounter = rowCounter
-            #    log("Bolo validovaných ", maxRowCounter, " záznamov.")
     log("Dáta z CSV súboru boli úspešne validované")
+    log("Počet chybných záznamov:" + str(failCounter))
     vlozDoDB(rows, id)
 
 def validujDataAnal1(row, request):
@@ -421,7 +455,10 @@ def validujDataAnal1(row, request):
         tcreate = tcreate[1:5] + '-' + tcreate[5:7] + '-' + tcreate[7:9]
         rowDict.update({'casVytvoreniaTransakcie': tcreate})
     else:
-        messages.info(request, 'Wrong form of tcreate field')
+        rowDict = None
+
+    if not rowDict:
+        return rowDict
     
     columnCounter += 10
     if obsahujeCislo(row[columnCounter]) and obsahujeCislo(row[columnCounter + 1]) and len(row[columnCounter+1]) == 3: ## "285 Kč" 
@@ -450,7 +487,10 @@ def validujDataAnal1(row, request):
     if userHash:
         rowDict.update({'pouzivatelId': userHash})
     else:
-        messages.info(request, 'Missing UserHash field')
+       rowDict = None
+
+    if not rowDict:
+        return rowDict
 
     ## psc
     columnCounter += 2
@@ -566,8 +606,19 @@ def validujDataAnal3(row, request):
     transactionId = row[columnCounter]
     rowDict.update({'transakciaId' : transactionId})
     
+    ## tcraete
+    columnCounter += 1 
+    tcreate = row[columnCounter]
+    if len(tcreate) == 18 and tcreate[15] == '.' and tcreate[1:9].isdigit():
+        tcreate = tcreate[1:5] + '-' + tcreate[5:7] + '-' + tcreate[7:9]
+        rowDict.update({'casVytvoreniaTransakcie': tcreate})
+    else:
+        rowDict = None
     
-    columnCounter += 8
+    if not rowDict:
+        return rowDict
+
+    columnCounter += 7
     ## konspekt Id - cbvk_us_cat*m0173078
     if obsahujeCislo(row[columnCounter]):
         konspektId = row[columnCounter].split("*")[1]
@@ -605,29 +656,39 @@ def validujDataAnal3(row, request):
         vek = row[columnCounter].replace('"', '')
         if vek.isdigit() and int(vek) >= 0:
             vek = int(vek)
-            v = None
             if vek <= 20:
                 v = VekovaSkupina.objects.get(id=0) 
+                rowDict.update({'vekovaSkupina_id': v})
             elif vek <= 30:
                 v = VekovaSkupina.objects.get(id=1) 
+                rowDict.update({'vekovaSkupina_id': v})
             elif vek <= 40:
-                v = VekovaSkupina.objects.get(id=2) 
+                v = VekovaSkupina.objects.get(id=2)
+                rowDict.update({'vekovaSkupina_id': v}) 
             elif vek <= 50:
                 v = VekovaSkupina.objects.get(id=3)
+                rowDict.update({'vekovaSkupina_id': v})
             elif vek <= 60:
                 v = VekovaSkupina.objects.get(id=4) 
+                rowDict.update({'vekovaSkupina_id': v})
             elif vek <= 70:
                 v = VekovaSkupina.objects.get(id=5) 
+                rowDict.update({'vekovaSkupina_id': v})
             elif vek <= 100:
-                v = VekovaSkupina.objects.get(id=6) 
-            rowDict.update({'vekovaSkupina_id': v})
+                v = VekovaSkupina.objects.get(id=6)
+                rowDict.update({'vekovaSkupina_id': v})
+            else:
+                v = VekovaSkupina.objects.get(id=0)
+                rowDict.update({'vekovaSkupina_id': v})
         else:
             v = VekovaSkupina.objects.get(id=0)
             rowDict.update({'vekovaSkupina_id': v})
     elif anonym == 1:
         v = VekovaSkupina.objects.get(id=0)
         rowDict.update({'vekovaSkupina_id': v})
-
+    else:
+        v = VekovaSkupina.objects.get(id=0)
+        rowDict.update({'vekovaSkupina_id': v})
     #---------------------------------------------
     return rowDict
 
@@ -638,22 +699,25 @@ def vlozDoDB(rows, id):
     if id == 1: ## Store model for analyza1
         for key, value in rows.items():
             obj = Analyza1Model()
-            for key, value in value.items():
-                setattr(obj, key, value)
+            for k, v in value.items():
+                setattr(obj, k, v)
             obj.save()
         doplnVekAPohlavie()
     elif id == 2: ## Store model for analyza2
         for key, value in rows.items():
             obj = Analyza2Model()
-            for key, value in value.items():
-                setattr(obj, key, value)
+            for k, v in value.items():
+                setattr(obj, k, v)
             obj.save()
     elif id == 3: ## Store model for analyza3
         for key, value in rows.items():
             obj = Analyza3Model()
-            for key, value in value.items():
-                setattr(obj, key, value)
-            obj.save()
+            for k, v in value.items():
+                setattr(obj, k, v)
+            try:
+                obj.save()
+            except:
+                print(key, value)
     log("Dáta boli úspešne uložené v databáze")
 
 def doplnVekAPohlavie():
@@ -804,6 +868,26 @@ def spracujVstupy(request, id):
                     konspekt.update({konspektId: obj.id}) 
         if konspekt:
             vstupy.update({'konspekt': konspekt})
+
+        ## Cas
+        cas = {}
+        if 'od' in postItems and not postItems['od'] == '':
+            cas.update({'od': postItems['od']})
+        if 'do' in postItems and not postItems['do'] == '':
+            cas.update({'do': postItems['do']})
+        if cas:
+            vstupy.update({'cas': cas})
+
+        ## Interval
+        interval = {}
+        if 'intervalRok' in postItems:
+            vstupy.update({'interval': YEARLY})
+        elif 'intervalMesiac' in postItems:
+            vstupy.update({'interval': MONTHLY})
+        elif 'intervalTyzden' in postItems:
+            vstupy.update({'interval': WEEKLY})
+        elif 'intervalDen' in postItems:
+            vstupy.update({'interval': DAILY})
   
     return vstupy
 
@@ -1063,6 +1147,18 @@ def spracovanieDat(vstupy, id):
         vystupy.update({'histogramy':histogramy})
         vystupy.update({'grafy':grafy})
     elif id == 3:
+        ## casovy interval
+        interval = None
+        if 'interval' in vstupy:
+            interval = vstupy['interval']
+        else:
+            interval = DAILY
+
+        ## min and max time 
+        maxDate = Analyza3Model.objects.all().values('casVytvoreniaTransakcie').order_by('-casVytvoreniaTransakcie')[0]
+        minDate = Analyza3Model.objects.all().values('casVytvoreniaTransakcie').order_by('casVytvoreniaTransakcie')[0]  
+        dates = [dt.date() for dt in rrule(interval, dtstart=minDate['casVytvoreniaTransakcie'], until=maxDate['casVytvoreniaTransakcie'])]
+
         ## Histogramy
         histogramy = {}
         
@@ -1083,40 +1179,127 @@ def spracovanieDat(vstupy, id):
         for r,v in result:
             histKonspekt.update({r : v})
         histogramy['histKonspekt'] = histKonspekt
-
-        ## Grafy
-        grafy = {}
-                
-        ## aggregate query filter
+        
+        
+        ## Grafy        
+        # query do tabulky a na grafy
+        conditionQuery = 'where '
+        skupinaCounter = 0
+        konspektCounter = 0
         query = Q()
         queryVekSk = Q()  
         if 'vekovaSkupina' in vstupy and 'all' not in vstupy['vekovaSkupina']:
+            conditionQuery += '('
             for k, v in dict(vstupy['vekovaSkupina']).items():
                 sk = VekovaSkupina.objects.get(id=v)
                 queryVekSk = queryVekSk | Q(vekovaSkupina_id=sk.id)
+                if skupinaCounter == 0:
+                    conditionQuery += '"bpapp_vekovaskupina".id = ' + str(sk.id)
+                else:
+                    conditionQuery += ' or "bpapp_vekovaskupina".id = ' + str(sk.id)
+                skupinaCounter += 1
+            conditionQuery += ')'
         query = query & queryVekSk
 
         queryKonspekt = Q()
         if 'konspekt' in vstupy and 'all' not in vstupy['konspekt']:
+            if skupinaCounter > 0:
+                conditionQuery += ' and ('
+            else:
+                conditionQuery += '('
             for k, v in dict(vstupy['konspekt']).items():
                 sk = Konspekt.objects.get(id=v) 
                 queryKonspekt = queryKonspekt | Q(konspekt_id=sk.id)
+                if konspektCounter == 0:
+                    conditionQuery += 'bpapp_konspekt.nazov = ' + '\'' + sk.nazov + '\''
+                else:
+                    conditionQuery += ' or bpapp_konspekt.nazov = ' + '\'' + sk.nazov + '\''
+                konspektCounter += 1
+            conditionQuery += ')'
         query = query & queryKonspekt
 
-        # print('QUERY',query)
-        graf = {}
-        # GET 
-        group = Analyza3Model.objects.all().filter(query)
-        for g in group:
-            graf.update({g.konspekt_id.id:g.vekovaSkupina_id.id})
-        grafy['graf']=graf
+        # casove intervaly
+        dateIntervals = None
+        if 'cas' in vstupy:
+            if len(vstupy['cas']) == 1:
+                if 'od' in vstupy['cas']:
+                    ## od - do current datetime
+                    od = dt.datetime.strptime(vstupy['cas']['od'], '%Y-%m-%d')
+                    dateIntervals = [dt.date() for dt in rrule(interval, dtstart=od, until=maxDate['casVytvoreniaTransakcie'])]
+                else:
+                    ## datetime < do
+                    do = dt.datetime.strptime(vstupy['cas']['do'], '%Y-%m-%d')
+                    dateIntervals = [dt.date() for dt in rrule(interval, dtstart=minDate['casVytvoreniaTransakcie'], until=do)]      
+            else:
+                ## od - do
+                od = dt.datetime.strptime(vstupy['cas']['od'], '%Y-%m-%d')
+                do = dt.datetime.strptime(vstupy['cas']['do'], '%Y-%m-%d')
+                dateIntervals = [dt.date() for dt in rrule(interval, dtstart=od, until=do)]      
+        else:
+            ## od min - do max
+            dateIntervals = [dt.date() for dt in rrule(interval, dtstart=minDate['casVytvoreniaTransakcie'], until=maxDate['casVytvoreniaTransakcie'])]      
 
+        graf = {}
+        counter = 0
+        dateQuery = ''
+        if skupinaCounter > 0 or konspektCounter > 0:
+            conditionQuery += ' and ('
+        else:
+            conditionQuery += '('
+        for dateInterval in range(int(len(dateIntervals))):
+            dateQuery = ''
+            if counter >= int(len(dateIntervals)) - 1:
+                dateQuery = conditionQuery + '"bpapp_analyza3model"."casVytvoreniaTransakcie" = \''+ dateIntervals[counter].strftime("%Y-%m-%d") + '\')'
+                stringQueryFirstPart = 'select "bpapp_vekovaskupina".skupina, bpapp_konspekt.nazov, "bpapp_analyza3model"."casVytvoreniaTransakcie", count("bpapp_analyza3model"."transakciaId") as pocet from bpapp_analyza3model inner join bpapp_konspekt on (bpapp_analyza3model.konspekt_id_id = "bpapp_konspekt"."id") inner join bpapp_vekovaskupina on ("bpapp_analyza3model"."vekovaSkupina_id_id" = "bpapp_vekovaskupina"."id") ' 
+                stringQuerySecondPart = ' group by "bpapp_vekovaskupina".skupina, bpapp_konspekt.nazov, "bpapp_analyza3model"."casVytvoreniaTransakcie" order by "bpapp_vekovaskupina".skupina, pocet DESC'
+                qry_str = stringQueryFirstPart + dateQuery + stringQuerySecondPart
+                cursor = connection.cursor()
+                cursor.execute(qry_str)
+                result = cursor.fetchall()
+                graf.update({counter:result})
+                #print('COUNTER', counter, 'query', qry_str)
+            else:    
+                dateQuery = conditionQuery + '"bpapp_analyza3model"."casVytvoreniaTransakcie" >= \''+ dateIntervals[counter].strftime("%Y-%m-%d") + '\' and "bpapp_analyza3model"."casVytvoreniaTransakcie" < \''+ dateIntervals[counter+1].strftime("%Y-%m-%d") + '\')'
+                stringQueryFirstPart = 'select "bpapp_vekovaskupina".skupina, bpapp_konspekt.nazov, "bpapp_analyza3model"."casVytvoreniaTransakcie", count("bpapp_analyza3model"."transakciaId") as pocet from bpapp_analyza3model inner join bpapp_konspekt on (bpapp_analyza3model.konspekt_id_id = "bpapp_konspekt"."id") inner join bpapp_vekovaskupina on ("bpapp_analyza3model"."vekovaSkupina_id_id" = "bpapp_vekovaskupina"."id") ' 
+                stringQuerySecondPart = ' group by "bpapp_vekovaskupina".skupina, bpapp_konspekt.nazov, "bpapp_analyza3model"."casVytvoreniaTransakcie" order by "bpapp_vekovaskupina".skupina, pocet DESC'
+                qry_str = stringQueryFirstPart + dateQuery + stringQuerySecondPart
+                cursor = connection.cursor()
+                cursor.execute(qry_str)
+                result = cursor.fetchall()
+                graf.update({counter:result})
+                #print('COUNTER', counter, 'query', qry_str)
+            counter += 1
+
+        # GET
+        grafy = {}
+        for key,values in graf.items():
+            histPomocnySkupina = {}
+            for vek in VekovaSkupina.objects.all():
+                histPomocny = {}
+                maxCount = 0
+                dalsiaSk = False
+                for s,k,c,p in values:
+                    if vek.skupina == s:
+                        maxCount += 1              
+                        histPomocny.update({maxCount : k})
+                    if maxCount == 3:
+                        dalsiaSk = True
+                        break
+                if dalsiaSk == True or maxCount > 0:
+                    if len(histPomocny) < 3:
+                        for i in range(maxCount + 1, 4):
+                            histPomocny.update({i + 1: '-'})
+                    histPomocnySkupina.update({vek.skupina:histPomocny})
+                    continue
+            grafy.update({c.strftime("%Y-%m-%d"):histPomocnySkupina})
+        #print('GRAFY', grafy) 
         ## Tabulka output
-        group = Analyza3Model.objects.all().filter(query).distinct('transakciaId')
+        tabulkaOutput = Analyza3Model.objects.all().filter(query).distinct('transakciaId')
                 
-        vystupy.update({'output': group})
+        vystupy.update({'output': tabulkaOutput})
+        vystupy.update({'output2' : grafy})
         vystupy.update({'histogramy':histogramy})
-        vystupy.update({'grafy':grafy})
+        #vystupy.update({'grafy':grafy})
 
     return vystupy
 
@@ -1319,6 +1502,7 @@ def analyzaDat(vystupy, id):
             elif k == 'histCas':
                 pair.update({'popis': "Histogram všetkých vykonaných transakcií podľa ich dátumu vytvorenia rozdelené do intervalou podľa vstupu alebo defaultne denne."})
                 plt.xlabel('Dátum', fontsize=18)
+                plt.subplots_adjust(left=0.155, bottom=0.32, right=0.983)
             elif k == 'histKonspekt':
                 pair.update({'popis': "Histogram všetkých transakcií podľa skupiny Konspektu"})
                 plt.xlabel('Konspekt', fontsize=18)
@@ -1327,76 +1511,6 @@ def analyzaDat(vystupy, id):
             inc += 1
 
     elif id == 3:
-         ## Hlavne Grafy
-        for k,graf in vystupy['grafy'].items():
-            ## - vstupne polia pre hlavne grafy
-            y = list(graf.values())
-            #x = []
-            #for key in list(graf.keys()):
-            #    x.append(key.strftime("%m/%d/%Y"))
-            x = list(graf.keys())
-            print("y",y)
-            print("x",x)
-            ## -------------Main Hist----------------
-            plt.bar(graf.keys(), graf.values(), color='g')
-            plt.suptitle('Histogram', fontsize=20)
-            plt.xlabel('Konspekt', fontsize=18)
-            plt.ylabel('Veková Skupina', fontsize=16)
-            plt.gcf().autofmt_xdate()
-            nazov = path + 'mainHist.png'
-            plt.savefig(nazov)
-            url = urlFront + 'mainHist.png'
-            pair = {}
-            pair.update({'url': url })
-            pair.update({'popis': "Histogram počtu transakcií podľa vstupných parametrov [Konspekt, Veková skupina] vzhľadom na čas ich vytvorenia, ktorý je rozdelený do rozsahu podľa vstupného parametra (defaulnte je to od najstaršej transakcie po najnovšiu) v intervaloch podľa vstupného parametra (defaultne to je Denne)."})
-            graphsDict.update({'pairMainHist': pair })
-            plt.close()
-            
-            ## ---------------Main Polynomial--------
-            lenX = len(x)
-            model = np.poly1d(np.polyfit(x, y, 3))
-            line = np.linspace(x[0], x[lenX-1], 10)
-            fig, ax = plt.subplots() 
-            plt.scatter(x, y)
-            plt.plot(line, model(line))
-            plt.suptitle('Polynomialna regresia', fontsize=20)
-            plt.xlabel('Konspekt', fontsize=18)
-            plt.ylabel('Veková Skupina', fontsize=16)
-            plt.gcf().autofmt_xdate()
-            nazov = path + 'polyMain.png'
-            plt.savefig(nazov)
-            url = urlFront + 'polyMain.png'
-            pair = {}
-            pair.update({'url': url })
-            pair.update({'popis': "Graf polynomialnej funkcie, ktorá zodpovedá vstupným parametrom. Ak neboli zadané žiadne, je aplikovaná na všetky dáta. Polynomiálna regresia je vhodnejšia na presnejšiu aproximáciu vstupných nezávislých dát (os x), čím sa snaží čo najlepšie predikovať závislé dáta. Ak sú ale veľké výkyvy hodnôt, môže byť nepresná. V tomto grafe je polynomialna funkcia 3 stupňa." })
-            graphsDict.update({'pairPolyMain': pair })
-            plt.close()
-
-            ## ---------------Main Linear-------------
-            slope, intercept, r, p, std_err = stats.linregress(x, y)
-            def func(x):
-                return slope * x + intercept
-            model = list(map(func, x))
-            fig, ax = plt.subplots()
-            ax.scatter(x, y)
-            ax.plot(x, model)
-            l = matplotlib.dates.AutoDateLocator()
-            f = matplotlib.dates.AutoDateFormatter(l)
-            ax.xaxis.set_major_locator(l)
-            ax.xaxis.set_major_formatter(f)
-            plt.suptitle('Lineárna regresia', fontsize=20)
-            plt.xlabel('Konspekt', fontsize=18)
-            plt.ylabel('Veková Skupina', fontsize=16)
-            plt.gcf().autofmt_xdate()
-            nazov = path + 'linMain.png'
-            plt.savefig(nazov)
-            url = urlFront + 'linMain.png'
-            pair = {}
-            pair.update({'url': url })
-            pair.update({'popis': "Graf lineárnej regresie. Lineárna regresia je základným typom analýzy na princípe \"Supervised learning\". Na rozdieľ od polynomiálnej funkcie, lineárna popisuje lineárny vzťah medzi závislou a nezávislou hodnotou."})
-            graphsDict.update({'pairLinMain': pair })
-            plt.close()
-
         # POMOCNE HISTOGRAMY
         inc = 1
         for k,v in vystupy['histogramy'].items():
@@ -1415,6 +1529,7 @@ def analyzaDat(vystupy, id):
             elif k == 'histKonspekt':
                 pair.update({'popis': "Histogram všetkých transakcií používateľov podľa skupiny Konspektu."})
                 plt.xlabel('Konspekt', fontsize=18)
+                plt.subplots_adjust(left=0.155, bottom=0.32, right=0.983)
             graphsDict.update({'pair' + 'histPart' + str(inc): pair})
             plt.close()
             inc += 1 

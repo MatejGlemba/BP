@@ -52,5 +52,6 @@ class Analyza2Model(models.Model):
 class Analyza3Model(models.Model):
     id = models.AutoField(primary_key=True)
     transakciaId = models.IntegerField()
+    casVytvoreniaTransakcie = models.DateField()
     vekovaSkupina_id = models.ForeignKey(VekovaSkupina, on_delete=models.CASCADE)
     konspekt_id = models.ForeignKey(Konspekt, on_delete=models.CASCADE)
